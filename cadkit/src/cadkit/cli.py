@@ -186,6 +186,32 @@ def cmd_info(a: argparse.Namespace) -> int:
     return int(res["exit_code"])
 
 
+def cmd_set(a: argparse.Namespace) -> int:
+    """Change parameter values in params.toml in place. Runs in-process; never runs model.py."""
+    from .worker import execute
+
+    values: dict[str, str] = {}
+    for item in a.assignments:
+        name, sep, value = item.partition("=")
+        if not sep or not name.strip():
+            msg = f"Expected name=value, got {item!r}"
+            print(json.dumps({"ok": False, "errors": [msg]}) if a.json else f"Error: {msg}", file=None if a.json else sys.stderr)
+            return EXIT_SCRIPT_ERROR
+        values[name.strip()] = value.strip()
+    res = execute({"op": "set_params", "project": a.path, "values": values})
+    if a.json:
+        print(json.dumps(res, indent=2))
+    elif not res["ok"]:
+        print(f"Error: {res['errors'][0]}", file=sys.stderr)
+    else:
+        out = Out()
+        for name, value in res["changed"].items():
+            out.p(f"{out.ok} {name} = {value}")
+        for w in res["warnings"]:
+            out.p(f"{out.warn} {w}")
+    return int(res["exit_code"])
+
+
 def cmd_serve(a: argparse.Namespace) -> int:
     from .serve import main as serve_main
 
@@ -250,6 +276,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("path", nargs="?", default=".", help="project folder (default: current folder)")
     common(p, path=False)
     p.set_defaults(func=cmd_info)
+
+    p = sub.add_parser("set", help="change parameter values in params.toml, e.g. cadkit set wall=2.4 length=90")
+    p.add_argument("assignments", nargs="+", metavar="name=value")
+    p.add_argument("--path", default=".", help="project folder (default: current folder)")
+    common(p, path=False)
+    p.set_defaults(func=cmd_set)
 
     p = sub.add_parser("serve", help="long-lived JSON-lines worker used by the desktop app")
     p.set_defaults(func=cmd_serve)

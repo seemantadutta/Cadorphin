@@ -16,6 +16,9 @@ Two forms are accepted per entry:
 
 from __future__ import annotations
 
+import json
+import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterator
@@ -109,3 +112,132 @@ def load_params(path: str | Path = "params.toml") -> Params:
         else:
             specs[name] = ParamSpec(name=name, value=entry)
     return Params(specs)
+
+
+# ---------------------------------------------------------------------------- writing
+
+_TABLE_RE = re.compile(r"^\s*\[\s*([A-Za-z0-9_\-]+|\"[^\"]*\")\s*\]\s*(#.*)?$")
+_KEY_RE = re.compile(r"^(\s*)([A-Za-z0-9_\-]+|\"[^\"]*\")(\s*=\s*)(.*)$")
+
+
+def coerce_value(spec: ParamSpec, raw: Any) -> Any:
+    """Convert a new value (from the CLI or GUI) to the type the parameter already has."""
+    old = spec.value
+    if isinstance(old, bool):
+        if isinstance(raw, bool):
+            return raw
+        s = str(raw).strip().lower()
+        if s in ("true", "on", "yes", "1"):
+            return True
+        if s in ("false", "off", "no", "0"):
+            return False
+        raise ParamError(f"{spec.name} is on/off; got {raw!r}")
+    if isinstance(old, (int, float)):
+        if isinstance(raw, bool):
+            raise ParamError(f"{spec.name} is a number; got {raw!r}")
+        try:
+            num = float(raw) if not isinstance(raw, (int, float)) else raw
+        except ValueError:
+            raise ParamError(f"{spec.name} is a number; got {raw!r}") from None
+        if num != num or num in (float("inf"), float("-inf")):
+            raise ParamError(f"{spec.name} must be a finite number")
+        if isinstance(old, int) and float(num).is_integer():
+            return int(num)
+        return float(num)
+    return str(raw)
+
+
+def _format_toml(value: Any) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float):
+        return f"{value:.1f}" if value.is_integer() else repr(value)
+    return json.dumps(value, ensure_ascii=False)
+
+
+def _split_comment(rest: str) -> tuple[str, str]:
+    """Split 'value   # comment' into ('value', '   # comment'), respecting quoted strings."""
+    quote = None
+    i = 0
+    while i < len(rest):
+        c = rest[i]
+        if quote:
+            if c == "\\" and quote == '"':
+                i += 1
+            elif c == quote:
+                quote = None
+        elif c in ("'", '"'):
+            quote = c
+        elif c == "#":
+            j = i
+            while j > 0 and rest[j - 1] in " \t":
+                j -= 1
+            return rest[:j], rest[j:]
+        i += 1
+    stripped = rest.rstrip()
+    return stripped, rest[len(stripped):]
+
+
+def _unquote(key: str) -> str:
+    return key[1:-1] if key.startswith('"') else key
+
+
+def set_params(path: str | Path, values: dict[str, Any]) -> dict[str, Any]:
+    """Change parameter values in params.toml, keeping comments, order and formatting.
+
+    Only existing parameters can be set; adding a parameter is a code change made by editing
+    the file. Returns {"changed": {name: new_value}, "warnings": [...]}.
+    """
+    path = Path(path)
+    if path.is_dir():
+        path = path / "params.toml"
+    params = load_params(path)
+    if not path.exists():
+        raise ParamError("This project has no params.toml")
+    new: dict[str, Any] = {}
+    for name, raw in values.items():
+        if name not in params.specs:
+            raise ParamError(f"No parameter named {name!r} in params.toml (have: {', '.join(params.specs) or 'none'})")
+        new[name] = coerce_value(params.specs[name], raw)
+
+    with open(path, encoding="utf-8", newline="") as f:  # keep CRLF files CRLF
+        text = f.read()
+    lines = text.splitlines(keepends=True)
+    table: str | None = None
+    done: set[str] = set()
+    for i, line in enumerate(lines):
+        body = line.rstrip("\r\n")
+        eol = line[len(body):]
+        m = _TABLE_RE.match(body)
+        if m:
+            table = _unquote(m.group(1))
+            continue
+        m = _KEY_RE.match(body)
+        if not m:
+            continue
+        key = _unquote(m.group(2))
+        target = table if (table is not None and key == "value") else (key if table is None else None)
+        if target in new and target not in done:
+            _, comment = _split_comment(m.group(4))
+            lines[i] = f"{m.group(1)}{m.group(2)}{m.group(3)}{_format_toml(new[target])}{comment}{eol}"
+            done.add(target)
+    missing = set(new) - done
+    if missing:
+        raise ParamError(f"Could not find where to write {', '.join(sorted(missing))} in params.toml")
+
+    out = "".join(lines)
+    check = tomllib.loads(out)  # never write a file that no longer parses
+    for name, value in new.items():
+        got = check[name]["value"] if isinstance(check.get(name), dict) else check.get(name)
+        if got != value:
+            raise ParamError(f"Internal error writing {name}: wrote {got!r}, expected {value!r}")
+
+    tmp = path.with_name(path.name + ".tmp")  # write-then-rename so watchers never see half a file
+    tmp.write_text(out, encoding="utf-8", newline="")
+    os.replace(tmp, path)
+
+    updated = load_params(path)
+    warnings = [w for w in updated.out_of_range() if any(f"Parameter {n} " in w for n in new)]
+    return {"changed": new, "warnings": warnings}

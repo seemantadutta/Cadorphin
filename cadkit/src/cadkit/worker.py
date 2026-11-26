@@ -196,6 +196,15 @@ def project_info(project: Project) -> dict[str, Any]:
 
 
 def execute(req: dict[str, Any]) -> dict[str, Any]:
+    if req["op"] == "set_params":
+        from .params import set_params
+
+        try:
+            project = load_project(req["project"])
+            out = set_params(project.root / "params.toml", req.get("values", {}))
+            return {"ok": True, "op": "set_params", "exit_code": EXIT_OK, "errors": [], **out}
+        except (ProjectError, ParamError) as e:
+            return {"ok": False, "op": "set_params", "exit_code": EXIT_SCRIPT_ERROR, "errors": [str(e)]}
     if req["op"] == "info":
         try:
             info = project_info(load_project(req["project"]))

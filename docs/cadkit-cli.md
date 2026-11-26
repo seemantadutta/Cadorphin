@@ -103,11 +103,27 @@ Prints the project name, printer profile, parameters (with their `unit`, `min`, 
  "files": ["AGENTS.md", "CLAUDE.md", "model.py", "params.toml", "project.toml"]}
 ```
 
+## `cadkit set name=value [name=value ...] [--path DIR]`
+
+Changes parameter values in `params.toml` in place. Only the value text changes: comments, order, the other keys and the file's line endings stay exactly as they were. The desktop app's parameters panel uses this, and agents can too.
+
+- Values take the parameter's existing type. Numbers stay numbers (an integer stays an integer when the new value is whole), and on/off parameters accept `true`/`false`, `on`/`off`, `yes`/`no` or `1`/`0`.
+- Only existing parameters can be set. To add one, edit `params.toml`.
+- A value outside `min`/`max` is written, with a warning.
+- The file is written to a temporary file and then renamed, so file watchers never see half a file.
+- It never runs `model.py`. Exit code 2 for an unknown parameter or a bad value; nothing is written in that case.
+
+```
+$ cadkit set wall=2.4 length=90
+✓ wall = 2.4
+✓ length = 90.0
+```
+
 ## `cadkit serve`
 
 A long-lived worker for the desktop app. Importing build123d takes about 3 s, so the app starts this once and sends it requests, instead of paying that cost on every rebuild.
 
-- It reads one JSON request per line on stdin: `{"id": 1, "op": "build" | "check" | "export" | "info" | "shutdown", "project": "<path>", ...}`. Other fields are the same options as the matching command, e.g. `"quality"`, `"level"`, `"format"`, `"out"` or `"force"`.
+- It reads one JSON request per line on stdin: `{"id": 1, "op": "build" | "check" | "export" | "info" | "set_params" | "shutdown", "project": "<path>", ...}`. `set_params` takes `"values": {"name": value}`. Other fields are the same options as the matching command, e.g. `"quality"`, `"level"`, `"format"`, `"out"` or `"force"`.
 - It writes one line per request on stdout: `{"id": 1, "result": {...}}`. The result is the same JSON the matching command prints with `--json`. If the request itself is malformed, it writes `{"id": 1, "error": "..."}` instead.
 - The first line it writes is `{"ready": true, "cadkit": "...", "build123d": "...", "startup_ms": ...}`.
 - It handles requests one at a time. Project modules are reloaded for every request, so edits to `model.py` and helper modules always take effect.
