@@ -2,6 +2,7 @@
 //! watches the project folder and serves files to the UI. All CAD work happens in cadkit.
 
 mod engine;
+mod terminal;
 
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -13,6 +14,7 @@ use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter, Manager};
 
 use engine::{Engine, EngineError, PythonCmd};
+use terminal::Terminals;
 
 const BUILD_TIMEOUT: Duration = Duration::from_secs(30);
 const EXPORT_TIMEOUT: Duration = Duration::from_secs(120);
@@ -192,6 +194,50 @@ async fn export(app: AppHandle, format: String, out_dir: Option<String>) -> Resu
     .await
 }
 
+/// Change parameter values in params.toml through cadkit (format-preserving). The file
+/// watcher then sees the change and the UI rebuilds, exactly as if an agent had edited it.
+#[tauri::command]
+async fn write_params(app: AppHandle, values: Value) -> Result<Value, String> {
+    blocking(move || {
+        let root = project_root(&app)?;
+        let res = engine_request(&app, json!({"op": "set_params", "project": root, "values": values}), BUILD_TIMEOUT)?;
+        if res["ok"] != json!(true) {
+            return Err(res["errors"][0].as_str().unwrap_or("Could not write params.toml").to_string());
+        }
+        Ok(res)
+    })
+    .await
+}
+
+/// Opens the user's shell in the project folder. `command`, if given, is typed into it
+/// (used by the "+" menu's agent shortcuts); the shell stays open after it exits.
+#[tauri::command]
+fn open_terminal(app: AppHandle, cwd: Option<String>, command: Option<String>, cols: u16, rows: u16) -> Result<String, String> {
+    let dir = match cwd {
+        Some(c) if !c.is_empty() => PathBuf::from(c),
+        _ => project_root(&app)?,
+    };
+    // The folder holding the engine's python (a venv's Scripts/ or bin/) also holds `cadkit`.
+    let python = app.state::<AppState>().python.program.clone();
+    let tools = python.is_absolute().then(|| python.parent().map(Path::to_path_buf)).flatten();
+    app.state::<Terminals>().open(&app, &dir, command, tools.as_deref(), cols, rows)
+}
+
+#[tauri::command]
+fn write_terminal(app: AppHandle, id: String, data: String) -> Result<(), String> {
+    app.state::<Terminals>().write(&id, &data)
+}
+
+#[tauri::command]
+fn resize_terminal(app: AppHandle, id: String, cols: u16, rows: u16) -> Result<(), String> {
+    app.state::<Terminals>().resize(&id, cols, rows)
+}
+
+#[tauri::command]
+fn close_terminal(app: AppHandle, id: String) {
+    app.state::<Terminals>().close(&id);
+}
+
 /// Project to open at startup: first command-line argument, else CADORPHIN_PROJECT.
 #[tauri::command]
 fn initial_project() -> Option<String> {
@@ -234,8 +280,19 @@ pub fn run() {
             check,
             export,
             read_file,
-            load_asset
+            load_asset,
+            write_params,
+            open_terminal,
+            write_terminal,
+            resize_terminal,
+            close_terminal
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running Cadorphin");
+        .manage(Terminals::default())
+        .build(tauri::generate_context!())
+        .expect("error while building Cadorphin")
+        .run(|app, event| {
+            if let tauri::RunEvent::Exit = event {
+                app.state::<Terminals>().close_all(); // don't leave shells (or agents) running
+            }
+        });
 }
