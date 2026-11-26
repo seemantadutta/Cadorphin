@@ -8,7 +8,10 @@ interface Settings {
   projection: Projection;
   theme: ThemeChoice;
   bottomPanelOpen: boolean;
+  bottomPanelHeight: number;
   hintDismissed: boolean;
+  /** Recent commands from the terminal menu's "Custom command…" box. */
+  customCommands: string[];
 }
 
 const DEFAULTS: Settings = {
@@ -17,7 +20,9 @@ const DEFAULTS: Settings = {
   projection: "perspective",
   theme: "system",
   bottomPanelOpen: true,
+  bottomPanelHeight: 280,
   hintDismissed: false,
+  customCommands: [],
 };
 
 const KEY = "cadorphin.settings";

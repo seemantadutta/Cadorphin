@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useBackend } from "./backend/context";
-import { BottomPanel, type BottomTab } from "./components/BottomPanel";
+import { BottomPanel, type BottomTab, type TermTab } from "./components/BottomPanel";
 import { Sidebar } from "./components/Sidebar";
 import { StatusBar } from "./components/StatusBar";
 import { TopBar } from "./components/TopBar";
@@ -28,10 +28,12 @@ function useTheme(choice: ThemeChoice): "light" | "dark" {
 
 export function App() {
   const backend = useBackend();
-  const { state, pickAndOpen, runCheck } = useProject();
+  const { state, pickAndOpen, runCheck, setParam, log } = useProject();
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [panelOpen, setPanelOpen] = useState(settings.get("bottomPanelOpen"));
   const [tab, setTab] = useState<BottomTab>("log");
+  const [terminals, setTerminals] = useState<TermTab[]>([]);
+  const termCounter = useRef(0);
   const [themeChoice, setThemeChoice] = useState<ThemeChoice>(settings.get("theme"));
   const [controls, setControls] = useState<ControlsMode>(settings.get("controls"));
   const [openFiles, setOpenFiles] = useState<{ path: string; text: string }[]>([]);
@@ -82,13 +84,36 @@ export function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [check]);
 
-  // Show build failures in the log.
+  // Show build failures in the log, but never pull the user out of a terminal (an agent may be
+  // mid-edit); the status pill shows the failure there.
   useEffect(() => {
     if (state.status === "error") {
-      setTab("log");
-      setPanelOpen(true);
+      setTab((t) => (t.startsWith("term:") ? t : "log"));
     }
   }, [state.status]);
+
+  const newTerminal = useCallback((command?: string, label?: string) => {
+    termCounter.current += 1;
+    const n = termCounter.current;
+    const key = String(n);
+    setTerminals((ts) => [...ts, { key, label: label ?? (n === 1 ? "Terminal" : `Terminal ${n}`), command, exited: false }]);
+    setTab(`term:${key}`);
+    setPanelOpen(true);
+  }, []);
+
+  const closeTerminal = (key: string) => {
+    setTerminals((ts) => {
+      const rest = ts.filter((t) => t.key !== key);
+      setTab((cur) => (cur === `term:${key}` ? (rest.length ? `term:${rest[rest.length - 1].key}` : "log") : cur));
+      return rest;
+    });
+  };
+
+  // Open one plain terminal in the project folder when a project is first opened.
+  const projectRoot = state.project?.root;
+  useEffect(() => {
+    if (projectRoot && termCounter.current === 0) newTerminal();
+  }, [projectRoot, newTerminal]);
 
   const openFile = async (path: string) => {
     if (!openFiles.some((f) => f.path === path)) {
@@ -140,6 +165,7 @@ export function App() {
             activeFile={activeFile}
             onOpenFile={openFile}
             onToggleBody={toggleBody}
+            onSetParam={setParam}
           />
         )}
         <main className="center">
@@ -219,7 +245,20 @@ export function App() {
                   </div>
                 )}
               </div>
-              <BottomPanel open={panelOpen} tab={tab} log={state.log} problems={state.problems} onTab={setTab} onToggle={togglePanel} />
+              <BottomPanel
+                open={panelOpen}
+                tab={tab}
+                log={state.log}
+                problems={state.problems}
+                terminals={terminals}
+                theme={theme}
+                onTab={setTab}
+                onToggle={togglePanel}
+                onNewTerminal={newTerminal}
+                onCloseTerminal={closeTerminal}
+                onTerminalExit={(key) => setTerminals((ts) => ts.map((t) => (t.key === key ? { ...t, exited: true } : t)))}
+                onTerminalError={(m) => log("error", `Terminal: ${m}`)}
+              />
             </>
           ) : (
             <Welcome

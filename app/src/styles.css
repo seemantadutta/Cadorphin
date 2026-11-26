@@ -382,21 +382,60 @@ pre,
   margin-bottom: 6px;
 }
 
-.param span {
+/* Only the label truncates; the unit inside the input must stay readable. */
+.param > span:first-child {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.param input {
-  flex: 0 0 92px;
-  width: 92px;
-  padding: 5px 8px;
+.param-input .unit {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.param-input {
+  flex: 0 0 104px;
+  display: flex;
+  align-items: center;
   border-radius: 4px;
   border: 1px solid var(--border-strong);
   background: var(--input);
+}
+
+.param-input:focus-within {
+  border-color: var(--accent);
+}
+
+.param-input.warn {
+  border-color: var(--warn);
+}
+
+.param-input.invalid {
+  border-color: var(--err);
+}
+
+.param-input input {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  padding: 5px 0 5px 8px;
+  border: 0;
+  outline: none;
+  background: transparent;
   color: var(--fg);
   font-size: 12px;
+}
+
+.param-input .unit {
+  padding: 0 8px 0 4px;
+  font-size: 11px;
+}
+
+.param-check {
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
 }
 
 .bodies li label {
@@ -598,8 +637,132 @@ button.doc-tab {
   flex-direction: column;
 }
 
-.bottom.open {
-  height: 220px;
+.bottom {
+  position: relative;
+}
+
+.resize-handle {
+  position: absolute;
+  top: -3px;
+  left: 0;
+  right: 0;
+  height: 6px;
+  cursor: ns-resize;
+  z-index: 3;
+}
+
+.resize-handle:hover {
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.panel-body-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.panel-body-wrap > .panel-body {
+  flex: 1 1 auto;
+}
+
+.terminal-host {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 6px 0 0 12px;
+  background: var(--bottom);
+}
+
+.terminal-host .xterm {
+  height: 100%;
+}
+
+.term-tab {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 2px 0 0;
+}
+
+.term-tab button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  height: 28px;
+  padding: 0 4px 0 10px;
+}
+
+.term-tab .close {
+  padding: 0 6px;
+  color: var(--muted);
+  font-size: 14px;
+  visibility: hidden;
+}
+
+.term-tab:hover .close,
+.term-tab.active .close {
+  visibility: visible;
+}
+
+.term-tab.exited button:first-child {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.new-term {
+  position: relative;
+}
+
+.menu {
+  position: absolute;
+  bottom: 34px;
+  left: 0;
+  min-width: 260px;
+  padding: 6px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.3);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+}
+
+.menu button {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  color: var(--fg-2);
+  padding: 7px 10px;
+  border-radius: 5px;
+}
+
+.menu button:hover {
+  background: var(--active);
+  color: var(--fg);
+}
+
+.menu-sep {
+  height: 1px;
+  margin: 5px 4px;
+  background: var(--border);
+}
+
+.menu-label {
+  padding: 4px 10px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.menu-custom input {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 5px;
+  border: 1px solid var(--border-strong);
+  background: var(--input);
+  color: var(--fg);
+  font-size: 12px;
 }
 
 .tabs {

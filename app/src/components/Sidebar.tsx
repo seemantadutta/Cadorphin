@@ -1,4 +1,5 @@
-import type { BodyInfo, ParamSpec, ProjectInfo } from "../backend/types";
+import type { BodyInfo, ParamSpec, ParamValue, ProjectInfo } from "../backend/types";
+import { ParamField } from "./ParamField";
 
 interface Props {
   project: ProjectInfo;
@@ -7,14 +8,10 @@ interface Props {
   activeFile: string | null;
   onOpenFile: (path: string) => void;
   onToggleBody: (name: string) => void;
+  onSetParam: (name: string, value: ParamValue) => void;
 }
 
-function formatValue(p: ParamSpec) {
-  if (typeof p.value === "boolean") return p.value ? "on" : "off";
-  return p.unit ? `${p.value} ${p.unit}` : String(p.value);
-}
-
-export function Sidebar({ project, bodies, hidden, activeFile, onOpenFile, onToggleBody }: Props) {
+export function Sidebar({ project, bodies, hidden, activeFile, onOpenFile, onToggleBody, onSetParam }: Props) {
   const groups = new Map<string, ParamSpec[]>();
   for (const p of project.params) {
     const g = p.group ?? "Parameters";
@@ -44,10 +41,7 @@ export function Sidebar({ project, bodies, hidden, activeFile, onOpenFile, onTog
           <div key={group} className="param-group">
             {groups.size > 1 && <h3>{group}</h3>}
             {params.map((p) => (
-              <label key={p.name} className="param" title={`${p.name} · editing from the app arrives in M3; edit params.toml for now`}>
-                <span>{p.label ?? p.name}</span>
-                <input className="mono" value={formatValue(p)} readOnly />
-              </label>
+              <ParamField key={p.name} spec={p} onCommit={onSetParam} />
             ))}
           </div>
         ))}

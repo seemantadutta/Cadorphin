@@ -96,6 +96,12 @@ export interface ExportResult {
 
 export type ParamValue = number | string | boolean;
 
+/** Output of `cadkit set --json`. */
+export interface SetParamsResult {
+  changed: Record<string, ParamValue>;
+  warnings: string[];
+}
+
 export interface Backend {
   /** Starts the CAD engine if needed. Rejects with a setup message if Python/cadkit is missing. */
   engineInfo(): Promise<EngineInfo>;
@@ -111,11 +117,18 @@ export interface Backend {
   check(level: "fast" | "full"): Promise<CheckReport>;
   export(format: "step" | "stl" | "3mf", outDir?: string): Promise<ExportResult>;
   readFile(path: string): Promise<string>;
-  writeParams(values: Record<string, ParamValue>): Promise<void>;
-  openTerminal(opts: { cwd: string; command?: string }): Promise<TerminalId>;
+  /** Changes values in params.toml (via `cadkit set`). The watcher then triggers a rebuild. */
+  writeParams(values: Record<string, ParamValue>): Promise<SetParamsResult>;
+  /**
+   * Opens the user's shell in a PTY (default cwd: the project folder). `command`, if given, is typed
+   * into the shell after it starts; the shell stays open when the command exits.
+   */
+  openTerminal(opts: { cwd?: string; command?: string; cols: number; rows: number }): Promise<TerminalId>;
   writeTerminal(id: TerminalId, data: string): void;
   resizeTerminal(id: TerminalId, cols: number, rows: number): void;
+  /** Output may arrive before the subscription; it is buffered and replayed. */
   onTerminalData(id: TerminalId, cb: (data: string) => void): Unsubscribe;
+  onTerminalExit(id: TerminalId, cb: (code: number | null) => void): Unsubscribe;
   closeTerminal(id: TerminalId): Promise<void>;
   /** GLB files and renders, as raw bytes. Paths are relative to the project folder. */
   loadAsset(path: string): Promise<ArrayBuffer>;

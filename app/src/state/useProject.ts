@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useBackend } from "../backend/context";
-import type { BuildManifest, CheckReport, EngineInfo, Problem, ProjectInfo } from "../backend/types";
+import type { BuildManifest, CheckReport, EngineInfo, ParamValue, Problem, ProjectInfo } from "../backend/types";
 import type { ViewerBody } from "../viewer/Viewer";
 import { settings } from "../settings";
 
@@ -153,6 +153,27 @@ export function useProject() {
     }
   }, [backend, log, patch]);
 
+  /** Write one parameter to params.toml. The file watcher then rebuilds, as for any other edit. */
+  const setParam = useCallback(
+    async (name: string, value: ParamValue) => {
+      if (!projectRef.current) return;
+      const before = projectRef.current;
+      const optimistic = { ...before, params: before.params.map((p) => (p.name === name ? { ...p, value } : p)) };
+      projectRef.current = optimistic;
+      patch({ project: optimistic });
+      try {
+        const res = await backend.writeParams({ [name]: value });
+        log("info", `Set ${Object.entries(res.changed).map(([k, v]) => `${k} = ${v}`).join(", ")}`);
+        res.warnings.forEach((w) => log("error", w));
+      } catch (e) {
+        log("error", `Could not set ${name}: ${String(e)}`);
+        projectRef.current = before;
+        patch({ project: before });
+      }
+    },
+    [backend, log, patch],
+  );
+
   // Rebuild when model files change on disk (the agent or an editor saved something).
   useEffect(() => {
     return backend.onFileChanged(async (paths) => {
@@ -183,5 +204,5 @@ export function useProject() {
       });
   }, [backend, state.engine, openProject]);
 
-  return { state, openProject, pickAndOpen, rebuild, runCheck };
+  return { state, openProject, pickAndOpen, rebuild, runCheck, setParam, log };
 }

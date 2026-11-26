@@ -2,20 +2,51 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 
-import {
-  NotYetImplemented,
-  type Backend,
-  type BuildManifest,
-  type CheckReport,
-  type EngineInfo,
-  type ExportResult,
-  type ProjectInfo,
-  type TerminalId,
-  type Unsubscribe,
+import type {
+  Backend,
+  BuildManifest,
+  CheckReport,
+  EngineInfo,
+  ExportResult,
+  ParamValue,
+  ProjectInfo,
+  SetParamsResult,
+  TerminalId,
+  Unsubscribe,
 } from "./types";
+
+/**
+ * Routes one app-wide Tauri event to per-terminal subscribers. Events for a terminal that has no
+ * subscriber yet (output that arrives before openTerminal() resolves) are buffered and replayed.
+ */
+class TerminalEvents<T> {
+  private subs = new Map<TerminalId, (payload: T) => void>();
+  private pending = new Map<TerminalId, T[]>();
+
+  constructor(event: string, pick: (raw: { id: string } & Record<string, unknown>) => T) {
+    void listen<{ id: string } & Record<string, unknown>>(event, (e) => {
+      const value = pick(e.payload);
+      const cb = this.subs.get(e.payload.id);
+      if (cb) cb(value);
+      else this.pending.set(e.payload.id, [...(this.pending.get(e.payload.id) ?? []), value]);
+    });
+  }
+
+  subscribe(id: TerminalId, cb: (payload: T) => void): Unsubscribe {
+    this.subs.set(id, cb);
+    this.pending.get(id)?.forEach(cb);
+    this.pending.delete(id);
+    return () => {
+      if (this.subs.get(id) === cb) this.subs.delete(id);
+    };
+  }
+}
 
 /** Desktop backend: Tauri commands implemented in app/src-tauri/src/lib.rs. */
 export class TauriBackend implements Backend {
+  private termData = new TerminalEvents<string>("terminal-data", (p) => p.data as string);
+  private termExit = new TerminalEvents<number | null>("terminal-exit", (p) => (p.code as number | null) ?? null);
+
   engineInfo() {
     return invoke<EngineInfo>("engine_info");
   }
@@ -70,21 +101,31 @@ export class TauriBackend implements Backend {
     return invoke<ArrayBuffer>("load_asset", { path });
   }
 
-  async writeParams(): Promise<void> {
-    throw new NotYetImplemented("Editing parameters", "M3");
+  writeParams(values: Record<string, ParamValue>) {
+    return invoke<SetParamsResult>("write_params", { values });
   }
 
-  async openTerminal(): Promise<TerminalId> {
-    throw new NotYetImplemented("The terminal", "M3");
+  openTerminal(opts: { cwd?: string; command?: string; cols: number; rows: number }) {
+    return invoke<TerminalId>("open_terminal", { cwd: opts.cwd ?? null, command: opts.command ?? null, cols: opts.cols, rows: opts.rows });
   }
 
-  writeTerminal() {}
-
-  resizeTerminal() {}
-
-  onTerminalData(): Unsubscribe {
-    return () => {};
+  writeTerminal(id: TerminalId, data: string) {
+    void invoke("write_terminal", { id, data }).catch(() => {});
   }
 
-  async closeTerminal() {}
+  resizeTerminal(id: TerminalId, cols: number, rows: number) {
+    void invoke("resize_terminal", { id, cols, rows }).catch(() => {});
+  }
+
+  onTerminalData(id: TerminalId, cb: (data: string) => void) {
+    return this.termData.subscribe(id, cb);
+  }
+
+  onTerminalExit(id: TerminalId, cb: (code: number | null) => void) {
+    return this.termExit.subscribe(id, cb);
+  }
+
+  async closeTerminal(id: TerminalId) {
+    await invoke("close_terminal", { id });
+  }
 }
