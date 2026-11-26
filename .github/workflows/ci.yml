@@ -16,7 +16,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: ubuntu-latest, python: "3.10" }
+          - { os: ubuntu-latest, python: "3.11" } # oldest supported (build123d 0.13 needs 3.11)
           - { os: ubuntu-latest, python: "3.12" }
           - { os: windows-latest, python: "3.12" }
           - { os: macos-latest, python: "3.12" }

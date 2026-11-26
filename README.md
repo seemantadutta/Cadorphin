@@ -16,7 +16,7 @@ Cadorphin is an open-source desktop app for makers and electronics hobbyists. Yo
 
 ## Try the CAD engine
 
-Requires Python 3.10–3.12.
+Requires Python 3.11 or 3.12.
 
 ```sh
 python -m venv .venv

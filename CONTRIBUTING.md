@@ -4,7 +4,7 @@ Thanks for helping. Issues and pull requests are welcome.
 
 ## Development setup
 
-**cadkit (Python 3.10–3.12)**
+**cadkit (Python 3.11–3.12)**
 
 ```sh
 python -m venv .venv

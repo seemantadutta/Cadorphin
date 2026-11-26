@@ -16,7 +16,7 @@ use serde_json::{json, Value};
 const STARTUP_TIMEOUT: Duration = Duration::from_secs(120);
 const STDERR_TAIL: usize = 6000;
 
-/// How to run Python. v1 requires the user to install Python 3.10–3.12 with cadkit.
+/// How to run Python. v1 requires the user to install Python 3.11–3.12 with cadkit.
 #[derive(Clone, Debug)]
 pub struct PythonCmd {
     pub program: PathBuf,
@@ -59,7 +59,7 @@ pub struct Engine {
 
 fn setup_hint(python: &Path) -> String {
     format!(
-        "Cadorphin needs Python 3.10–3.12 with cadkit installed (pip install cadkit), \
+        "Cadorphin needs Python 3.11–3.12 with cadkit installed (pip install cadkit), \
          or set CADORPHIN_PYTHON to a Python that has it. Tried: {}",
         python.display()
     )
