@@ -1,0 +1,39 @@
+[length]
+value = 60.0
+unit = "mm"
+min = 20
+max = 200
+label = "Length"
+group = "Size"
+
+[width]
+value = 40.0
+unit = "mm"
+min = 20
+max = 200
+label = "Width"
+group = "Size"
+
+[height]
+value = 25.0
+unit = "mm"
+min = 10
+max = 150
+label = "Height"
+group = "Size"
+
+[wall]
+value = 2.0
+unit = "mm"
+min = 1.2
+max = 5
+label = "Wall thickness"
+group = "Shape"
+
+[corner_radius]
+value = 4.0
+unit = "mm"
+min = 0.5
+max = 10
+label = "Corner radius"
+group = "Shape"

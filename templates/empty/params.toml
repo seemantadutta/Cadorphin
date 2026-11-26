@@ -1,0 +1,9 @@
+# Tunable values for model.py, read there as p.<name>. Add one table per parameter, e.g.:
+#
+# [length]
+# value = 60.0
+# unit = "mm"
+# min = 20
+# max = 200
+# label = "Length"
+# group = "Size"

@@ -8,6 +8,7 @@
   "properties": {
     "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$", "description": "Must match the file name without .json" },
     "name": { "type": "string", "minLength": 1 },
+    "vendor": { "type": "string", "minLength": 1, "description": "Groups profiles in the app's printer list, e.g. \"Bambu Lab\" or \"Generic\"" },
     "build_volume_mm": { "type": "array", "items": { "type": "number", "exclusiveMinimum": 0 }, "minItems": 3, "maxItems": 3, "description": "Printable X, Y, Z" },
     "plate_mm": { "type": "array", "items": { "type": "number", "exclusiveMinimum": 0 }, "minItems": 2, "maxItems": 2, "description": "Physical plate X, Y" },
     "nozzle_diameters_mm": { "type": "array", "items": { "type": "number", "exclusiveMinimum": 0 }, "minItems": 1 },

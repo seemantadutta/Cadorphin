@@ -1,0 +1,10 @@
+{
+  "id": "bambu-a1",
+  "name": "Bambu Lab A1",
+  "vendor": "Bambu Lab",
+  "build_volume_mm": [256, 256, 256],
+  "plate_mm": [256, 256],
+  "nozzle_diameters_mm": [0.2, 0.4, 0.6, 0.8],
+  "defaults": { "min_wall_mm": 1.2, "fit_clearance_mm": 0.2, "layer_height_mm": 0.2 },
+  "notes": "Open-frame bed slinger. Volumes are from Bambu Lab's published specifications."
+}

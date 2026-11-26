@@ -24,9 +24,9 @@ class Body:
 
 def coerce_bodies(result: Any) -> dict[str, Body]:
     """Validate what build(params) returned and normalise it to dict[str, Body]."""
-    if not isinstance(result, dict) or not result:
+    if not isinstance(result, dict):  # an empty dict is fine: a model with nothing in it yet
         raise TypeError(
-            "build(params) must return a non-empty dict mapping body names to Body objects, "
+            "build(params) must return a dict mapping body names to Body objects, "
             f"got {type(result).__name__}"
         )
     bodies: dict[str, Body] = {}

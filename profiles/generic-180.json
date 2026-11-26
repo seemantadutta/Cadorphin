@@ -1,6 +1,7 @@
 {
   "id": "generic-180",
   "name": "Generic 180",
+  "vendor": "Generic",
   "build_volume_mm": [180, 180, 180],
   "plate_mm": [180, 180],
   "nozzle_diameters_mm": [0.4],

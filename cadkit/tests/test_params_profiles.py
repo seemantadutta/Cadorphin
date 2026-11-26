@@ -41,7 +41,7 @@ def test_profiles_match_schema():
     jsonschema = pytest.importorskip("jsonschema")
     schema = json.loads((REPO / "profiles" / "schema.json").read_text(encoding="utf-8"))
     ids = list_profiles()
-    assert ids == ["generic-180", "generic-220", "generic-256", "generic-300"]
+    assert {"generic-180", "generic-220", "generic-256", "generic-300", "bambu-p1s"} <= set(ids)
     for pid in ids:
         data = json.loads((REPO / "profiles" / f"{pid}.json").read_text(encoding="utf-8"))
         jsonschema.validate(data, schema)

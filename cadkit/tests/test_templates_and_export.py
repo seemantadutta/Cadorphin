@@ -90,11 +90,11 @@ def test_new_generates_agent_rules(tmp_path, cli):
     code, _ = cli("new", str(tmp_path / "p"), "--template", "blank", "--profile", "generic-180")
     assert code == 0
     p = tmp_path / "p"
-    assert {f.name for f in p.iterdir()} >= {"model.py", "params.toml", "project.toml", "CLAUDE.md", "AGENTS.md", ".gitignore"}
+    assert {f.name for f in p.iterdir()} >= {"model.py", "params.toml", "project.toml", "CLAUDE.md", "AGENTS.md", "GEMINI.md", ".gitignore"}
     for f in ("CLAUDE.md", "AGENTS.md", "project.toml"):
         text = (p / f).read_text(encoding="utf-8")
         assert "{{" not in text, f"unrendered placeholder in {f}"
-    assert "generic-180" in (p / "CLAUDE.md").read_text(encoding="utf-8")
+    assert "cadkit info" in (p / "CLAUDE.md").read_text(encoding="utf-8")  # the printer can change, so it isn't baked in
     assert "Claude Code" in (p / "CLAUDE.md").read_text(encoding="utf-8")
     assert 'profile = "generic-180"' in (p / "project.toml").read_text(encoding="utf-8")
     assert ".cad/" in (p / ".gitignore").read_text(encoding="utf-8")
@@ -120,3 +120,12 @@ def test_example_project(cli):
     assert code == 0, res
     assert res["profile"] == "generic-220"
     assert [b["name"] for b in res["bodies"]] == ["bracket"]
+
+
+def test_demo_project(cli):
+    """examples/demo is the box the app's dev setup opens; it must stay a valid, hollow, open box."""
+    code, res = cli("check", str(REPO / "examples" / "demo"))
+    assert code == 0, res
+    (box,) = res["bodies"]
+    assert box["name"] == "box" and box["bbox"] == [60.0, 40.0, 25.0]
+    assert 0 < box["volume_mm3"] < 0.5 * 60 * 40 * 25  # hollow, not a solid block

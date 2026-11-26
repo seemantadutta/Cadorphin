@@ -1,6 +1,7 @@
 {
   "id": "generic-220",
   "name": "Generic 220",
+  "vendor": "Generic",
   "build_volume_mm": [220, 220, 220],
   "plate_mm": [220, 220],
   "nozzle_diameters_mm": [0.4],

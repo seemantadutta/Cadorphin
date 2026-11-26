@@ -1,0 +1,10 @@
+{
+  "id": "bambu-x1c",
+  "name": "Bambu Lab X1 Carbon",
+  "vendor": "Bambu Lab",
+  "build_volume_mm": [256, 256, 256],
+  "plate_mm": [256, 256],
+  "nozzle_diameters_mm": [0.2, 0.4, 0.6, 0.8],
+  "defaults": { "min_wall_mm": 1.2, "fit_clearance_mm": 0.2, "layer_height_mm": 0.2 },
+  "notes": "Enclosed CoreXY. Volumes are from Bambu Lab's published specifications."
+}

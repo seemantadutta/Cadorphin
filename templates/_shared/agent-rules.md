@@ -7,6 +7,6 @@ This folder is a cadkit CAD project. You design the part by editing code; the Ca
 - `build(params)` returns a dict of named bodies: `{"case": Body(shape, material="PETG", color="#3A3F4A"), ...}`. Keep each separately printed part or material as its own named body.
 - After every change, run `cadkit check --full` and read the output. If the change affects shape, look at `.cad/renders/*.png` when they exist. Do not reply until the checks pass or you have explained the remaining warnings.
 - Export with `cadkit export --format 3mf` (or `step`, `stl`). Files go to `.cad/export/`.
-- The printer profile is `{{profile}}` ({{profile_name}}), set in `project.toml`. Respect its build volume and its defaults (minimum wall, fit clearance).
+- The printer is the `profile` in `project.toml`; the user can change it from Cadorphin's Preferences, so check `cadkit info` for the current build volume instead of remembering it. Respect that volume and the profile's defaults (minimum wall, fit clearance). Change the printer only when asked, with `cadkit set-profile ID` (`cadkit profiles` lists them).
 - Units are millimetres.
 - Do not edit anything in `.cad/`; it is generated.

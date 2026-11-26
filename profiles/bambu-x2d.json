@@ -1,0 +1,10 @@
+{
+  "id": "bambu-x2d",
+  "name": "Bambu Lab X2D",
+  "vendor": "Bambu Lab",
+  "build_volume_mm": [256, 256, 260],
+  "plate_mm": [256, 256],
+  "nozzle_diameters_mm": [0.2, 0.4, 0.6, 0.8],
+  "defaults": { "min_wall_mm": 1.2, "fit_clearance_mm": 0.2, "layer_height_mm": 0.2 },
+  "notes": "Enclosed dual-nozzle CoreXY. 256 x 256 x 260 mm with the main nozzle; with the auxiliary nozzle or both nozzles the volume is 235.5 x 256 x 256 mm. Volumes are from Bambu Lab's published specifications."
+}

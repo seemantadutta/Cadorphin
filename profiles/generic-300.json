@@ -1,6 +1,7 @@
 {
   "id": "generic-300",
   "name": "Generic 300",
+  "vendor": "Generic",
   "build_volume_mm": [300, 300, 300],
   "plate_mm": [300, 300],
   "nozzle_diameters_mm": [0.4],

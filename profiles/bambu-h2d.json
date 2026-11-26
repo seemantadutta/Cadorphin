@@ -1,0 +1,10 @@
+{
+  "id": "bambu-h2d",
+  "name": "Bambu Lab H2D",
+  "vendor": "Bambu Lab",
+  "build_volume_mm": [325, 320, 325],
+  "plate_mm": [325, 320],
+  "nozzle_diameters_mm": [0.2, 0.4, 0.6, 0.8],
+  "defaults": { "min_wall_mm": 1.2, "fit_clearance_mm": 0.2, "layer_height_mm": 0.2 },
+  "notes": "Dual nozzle. 325 x 320 x 325 mm with one nozzle; a print that uses both nozzles is limited to 300 mm in X. Volumes are from Bambu Lab's published specifications."
+}

@@ -16,12 +16,13 @@
 | 2 | Script or project error: `model.py` raised, `params.toml` or `project.toml` is invalid, or there is no project. |
 | 3 | Timeout. |
 
-## `cadkit new <dir> [--template enclosure|blank] [--profile ID]`
+## `cadkit new <dir> [--template enclosure|blank|empty] [--profile ID] [--description TEXT]`
 
-Creates a project from a template. The folder must be new or empty. It generates `CLAUDE.md` and `AGENTS.md` (the rules for agents), `project.toml` (with the chosen printer profile, default `generic-256`) and `.gitignore`.
+Creates a project from a template. The folder must be new or empty. It generates `CLAUDE.md`, `AGENTS.md` and `GEMINI.md` (the rules for agents; Claude Code, Codex and most others, and Gemini CLI each read their own file). With `--description`, the text is appended to each of them as a **Design brief** section after the generated rules, so an agent starts out knowing what the design is for. It also writes `project.toml` (with the chosen printer profile, default `generic-256`) and `.gitignore`.
 
 - `enclosure`: a two-part case with lid, M2.5 heat-set insert bosses, a USB-C cutout and a separate light-pipe body.
 - `blank`: a single parametric cube.
+- `empty`: nothing yet. `build()` returns no bodies, ready for you or an agent to fill in. The app's New Project dialog starts with this one.
 
 ## `cadkit build [path] [--quality coarse|fine]`
 
@@ -71,7 +72,7 @@ Each problem has:
 | Field | Meaning |
 |---|---|
 | `severity` | `error` blocks export. `warning` does not. |
-| `code` | `script_error`, `not_solid`, `invalid_solid`, `open_shell`, `too_large`, `overlap` or `param_range`. |
+| `code` | `script_error`, `not_solid`, `invalid_solid`, `open_shell`, `too_large`, `overlap`, `param_range` or `no_bodies` (export of a model with no bodies). |
 | `message` | Human-readable text. |
 | `body` | Optional. The body the problem is about. |
 | `bodies` | Optional. All bodies involved, e.g. both bodies in an overlap. |
@@ -97,7 +98,7 @@ Prints the project name, printer profile, parameters (with their `unit`, `min`, 
 
 ```json
 {"ok": true, "root": "/path/demo", "name": "demo", "units": "mm",
- "profile": {"id": "generic-256", "name": "Generic 256", "build_volume_mm": [256, 256, 256], "plate_mm": [256, 256]},
+ "profile": {"id": "generic-256", "name": "Generic 256", "vendor": "Generic", "build_volume_mm": [256, 256, 256], "plate_mm": [256, 256]},
  "params": [{"name": "wall", "value": 2.2, "unit": "mm", "min": 1.2, "max": 5, "label": "Wall thickness", "group": "Case"}],
  "params_error": null,
  "files": ["AGENTS.md", "CLAUDE.md", "model.py", "params.toml", "project.toml"]}
@@ -119,11 +120,20 @@ $ cadkit set wall=2.4 length=90
 ✓ length = 90.0
 ```
 
+## `cadkit set-profile ID [--path DIR]`
+
+Chooses the project's printer by rewriting `profile = "..."` in `project.toml`. Nothing else in the file changes, and the file is replaced atomically, like `cadkit set`. If there is no top-level `profile` key, one is added before the first table. An unknown id exits with code 2 and writes nothing. The desktop app's Preferences → Printer uses this.
+
+```
+$ cadkit set-profile bambu-p1s
+✓ Printer: Bambu Lab P1S (256 x 256 x 256 mm)
+```
+
 ## `cadkit serve`
 
 A long-lived worker for the desktop app. Importing build123d takes about 3 s, so the app starts this once and sends it requests, instead of paying that cost on every rebuild.
 
-- It reads one JSON request per line on stdin: `{"id": 1, "op": "build" | "check" | "export" | "info" | "set_params" | "shutdown", "project": "<path>", ...}`. `set_params` takes `"values": {"name": value}`. Other fields are the same options as the matching command, e.g. `"quality"`, `"level"`, `"format"`, `"out"` or `"force"`.
+- It reads one JSON request per line on stdin: `{"id": 1, "op": "build" | "check" | "export" | "info" | "set_params" | "set_profile" | "profiles" | "shutdown", "project": "<path>", ...}`. `set_params` takes `"values": {"name": value}`; `set_profile` takes `"profile": "<id>"`; `profiles` lists printer profiles (bundled, plus the project's own when `project` is given) and needs no project. Other fields are the same options as the matching command, e.g. `"quality"`, `"level"`, `"format"`, `"out"` or `"force"`.
 - It writes one line per request on stdout: `{"id": 1, "result": {...}}`. The result is the same JSON the matching command prints with `--json`. If the request itself is malformed, it writes `{"id": 1, "error": "..."}` instead.
 - The first line it writes is `{"ready": true, "cadkit": "...", "build123d": "...", "startup_ms": ...}`.
 - It handles requests one at a time. Project modules are reloaded for every request, so edits to `model.py` and helper modules always take effect.
@@ -141,7 +151,7 @@ def build(p):
     return {"case": Body(case, material="PETG", color="#3A3F4A")}
 ```
 
-- `build(p)` returns a non-empty dict. Keys are body names: letters, digits, `_` and `-`. Values are `cadkit.Body` objects or bare build123d shapes.
+- `build(p)` returns a dict. It may be empty while a design has nothing in it yet: that builds and checks cleanly (`check` adds a note), but `export` refuses. Keys are body names: letters, digits, `_` and `-`. Values are `cadkit.Body` objects or bare build123d shapes.
 - `p` gives access to `params.toml` as `p.name` or `p["name"]`.
 - `Body.material` defaults to `[materials] default` in `project.toml`. `Body.color` is `#RRGGBB`.
 - The project folder is on `sys.path`, so `model.py` can import helpers such as `boards/`.
