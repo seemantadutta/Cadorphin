@@ -4,11 +4,11 @@
 Tauri v2 desktop shell (Rust)                         app/src-tauri   [M2, done]
 ├── Frontend: React + TypeScript + Vite               app/src
 │   ├── Viewer pane: three.js                         app/src/viewer  [M2, done]
-│   ├── Terminal pane: xterm.js                                       [M3]
-│   ├── Side panels: files, parameters (read-only until M3), bodies
+│   ├── Terminal pane: xterm.js, user's shell     app/src/terminal [M3]
+│   ├── Side panels: files, editable parameters, bodies
 │   └── Export dialog                                                 [M4]
 ├── Rust backend                                      app/src-tauri/src
-│   ├── PTY sessions (portable-pty) <-> xterm.js                      [M3]
+│   ├── PTY sessions (portable-pty) <-> xterm.js  terminal.rs
 │   ├── File watcher (notify, 300 ms debounce)        lib.rs
 │   └── CAD engine: one `python -m cadkit serve`      engine.rs
 └── Python package: cadkit                            cadkit/         [M1, done]
@@ -18,6 +18,19 @@ Tauri v2 desktop shell (Rust)                         app/src-tauri   [M2, done]
     ├── info    -> project name, profile, parameters, files
     └── serve   -> long-lived JSON-lines worker for the app
 ```
+
+## Terminals (M3)
+
+The bottom panel's terminal tabs run **the user's own shell** in a PTY (`portable-pty`), started in the project folder. On Windows that's PowerShell 7 if installed, else Windows PowerShell, else `cmd`; elsewhere it's `$SHELL` as a login shell. Cadorphin doesn't assume any particular agent. The "+" menu has shortcuts for well-known agent CLIs (Claude Code, Codex, Gemini CLI, Aider) and a custom command box. A shortcut only opens a normal terminal and types the command; add entries in `app/src/terminal/agents.ts`.
+
+- The engine's Python scripts folder is put first on the terminal's `PATH`, so `cadkit` in the terminal is the same one the app uses.
+- Terminals stay alive while their tab is hidden or the panel is collapsed. Closing a tab, or quitting the app, kills its shell.
+- Output that arrives before the UI subscribes to it is buffered and replayed. Multi-byte UTF-8 split across reads is reassembled.
+- Windows ConPTY asks the terminal for the cursor position at startup and waits for the answer. xterm.js answers automatically; the PTY test in `terminal.rs` does the same.
+
+## Parameters panel (M3)
+
+Editing a value calls `writeParams()`, which runs `cadkit set` in the engine. The file watcher then sees `params.toml` change and rebuilds, the same path as an agent's or an editor's edit. There's no separate "GUI changed it" route.
 
 ## The rebuild loop (M2)
 
