@@ -1,0 +1,34 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cadkit"
+version = "0.1.0"
+description = "Build, check and export parametric build123d models. The CAD engine behind Cadorphin."
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.10,<3.13"
+dependencies = [
+    "build123d==0.13.0",
+    "lib3mf>=2.4.1",
+    "tomli>=2.0; python_version < '3.11'",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "jsonschema>=4"]
+
+[project.scripts]
+cadkit = "cadkit.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cadkit"]
+
+# Printer profiles and project templates live at the repo root and are bundled into the wheel.
+# In an editable/dev install, cadkit finds them in the repo instead (see cadkit/resources.py).
+[tool.hatch.build.targets.wheel.force-include]
+"../profiles" = "cadkit/_data/profiles"
+"../templates" = "cadkit/_data/templates"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
