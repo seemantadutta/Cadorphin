@@ -1,0 +1,6 @@
+name = "{{project_name}}"
+profile = "{{profile}}"
+units = "mm"
+
+[materials]
+default = "PETG"

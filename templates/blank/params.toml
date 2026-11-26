@@ -1,0 +1,7 @@
+[size]
+value = 20.0
+unit = "mm"
+min = 1
+max = 200
+label = "Cube size"
+group = "Shape"
