@@ -1,0 +1,9 @@
+{
+  "id": "generic-300",
+  "name": "Generic 300",
+  "build_volume_mm": [300, 300, 300],
+  "plate_mm": [300, 300],
+  "nozzle_diameters_mm": [0.4],
+  "defaults": { "min_wall_mm": 1.2, "fit_clearance_mm": 0.2, "layer_height_mm": 0.2 },
+  "notes": "Generic 300 mm cube printer with a 0.4 mm nozzle. Use it when your printer has no profile yet."
+}

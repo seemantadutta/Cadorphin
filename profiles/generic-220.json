@@ -1,0 +1,9 @@
+{
+  "id": "generic-220",
+  "name": "Generic 220",
+  "build_volume_mm": [220, 220, 220],
+  "plate_mm": [220, 220],
+  "nozzle_diameters_mm": [0.4],
+  "defaults": { "min_wall_mm": 1.2, "fit_clearance_mm": 0.2, "layer_height_mm": 0.2 },
+  "notes": "Generic 220 mm cube printer with a 0.4 mm nozzle. Use it when your printer has no profile yet."
+}

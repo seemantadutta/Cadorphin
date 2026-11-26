@@ -1,0 +1,9 @@
+{
+  "id": "generic-256",
+  "name": "Generic 256",
+  "build_volume_mm": [256, 256, 256],
+  "plate_mm": [256, 256],
+  "nozzle_diameters_mm": [0.4],
+  "defaults": { "min_wall_mm": 1.2, "fit_clearance_mm": 0.2, "layer_height_mm": 0.2 },
+  "notes": "Generic 256 mm cube printer with a 0.4 mm nozzle. Use it when your printer has no profile yet."
+}

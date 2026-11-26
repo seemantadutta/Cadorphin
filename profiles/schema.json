@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:cadorphin:printer-profile-schema",
+  "title": "Printer profile",
+  "type": "object",
+  "required": ["id", "name", "build_volume_mm", "plate_mm", "nozzle_diameters_mm"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$", "description": "Must match the file name without .json" },
+    "name": { "type": "string", "minLength": 1 },
+    "build_volume_mm": { "type": "array", "items": { "type": "number", "exclusiveMinimum": 0 }, "minItems": 3, "maxItems": 3, "description": "Printable X, Y, Z" },
+    "plate_mm": { "type": "array", "items": { "type": "number", "exclusiveMinimum": 0 }, "minItems": 2, "maxItems": 2, "description": "Physical plate X, Y" },
+    "nozzle_diameters_mm": { "type": "array", "items": { "type": "number", "exclusiveMinimum": 0 }, "minItems": 1 },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "min_wall_mm": { "type": "number", "exclusiveMinimum": 0 },
+        "fit_clearance_mm": { "type": "number", "minimum": 0 },
+        "layer_height_mm": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "notes": { "type": "string" }
+  }
+}
