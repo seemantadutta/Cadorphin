@@ -20,8 +20,18 @@ The tests run real models through the CLI and take about a minute.
 cd app
 npm install
 npm run typecheck && npm run lint && npm run build
-npm run dev                                 # UI in a browser at http://localhost:1420
+npm run dev                                 # UI in a browser with fixture data (MockBackend)
 ```
+
+**Desktop shell (Rust stable + Tauri prerequisites)**
+
+```sh
+cd app
+npm run tauri dev                           # the real app, using the repo's .venv for cadkit
+cd src-tauri && cargo clippy -- -D warnings
+```
+
+The `MockBackend` fixtures in `app/src/backend/fixtures/` come from the enclosure template. Regenerate them when the template or the manifest format changes. See the README there.
 
 ## Ground rules
 

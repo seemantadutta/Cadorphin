@@ -4,7 +4,7 @@
 
 Cadorphin is an open-source desktop app for makers and electronics hobbyists. You describe the part to Claude Code, Codex or any other CLI agent in a terminal pane. The agent edits a parametric [build123d](https://github.com/gumyr/build123d) script. The 3D view updates live, checks catch problems before you print, and export gives you STEP, STL or multi-body 3MF for any slicer.
 
-> **Status:** early development. The CAD engine (`cadkit`) works from the command line today. The desktop app (viewer, terminal, panels) is next. See the [roadmap](#roadmap).
+> **Status:** early development. The CAD engine (`cadkit`) and the desktop app's live 3D viewer work today. The built-in agent terminal and the export dialog are next. See the [roadmap](#roadmap).
 
 ## Principles
 
@@ -32,10 +32,24 @@ Open `.cad/export/demo.3mf` in your slicer. The case, lid and light pipe are sep
 
 Then point your agent at the folder. `cadkit new` writes a `CLAUDE.md` / `AGENTS.md` that tells it how to work: edit `model.py` and `params.toml`, then run `cadkit check --full` after every change.
 
+## Run the desktop app (development)
+
+Requires the steps above, plus [Rust](https://rustup.rs), Node 20+ and the [Tauri prerequisites](https://tauri.app/start/prerequisites/) for your OS.
+
+```sh
+cd app
+npm install
+npm run tauri dev        # then "Open folder…" on the welcome screen
+```
+
+To open a project straight away, set `CADORPHIN_PROJECT` to its folder before running. The app also reopens the last project you used.
+
+The app watches the project folder and rebuilds whenever a file is saved, whether by you, your editor or your agent. Development builds use the repo's `.venv`. To use another Python, set `CADORPHIN_PYTHON`. `npm run dev` alone shows the UI in a browser with fixture data.
+
 ## Repository layout
 
 ```
-app/         desktop app: Tauri shell (M2) and React + TypeScript frontend
+app/         desktop app: Tauri shell (src-tauri/) and React + TypeScript frontend (src/)
 cadkit/      Python CAD engine and CLI
 profiles/    printer profiles (JSON) and their schema
 templates/   project templates: blank, enclosure
@@ -53,7 +67,7 @@ docs/        architecture, CLI reference, profiles, UI mockups
 
 - [x] **M0** Repo skeleton and CI
 - [x] **M1** `cadkit` core: `new`, `build`, `check --fast`, `export` (STEP, STL, 3MF)
-- [ ] **M2** Desktop shell and 3D viewer, live rebuild on file change
+- [x] **M2** Desktop shell and 3D viewer, live rebuild on file change
 - [ ] **M3** Terminal pane and agent loop, parameters panel
 - [ ] **M4** Full checks (thin walls, renders), Problems tab, export dialog, profile picker
 

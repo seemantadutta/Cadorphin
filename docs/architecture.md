@@ -1,27 +1,44 @@
 # Architecture
 
 ```
-Tauri v2 desktop shell (Rust)                         [M2]
+Tauri v2 desktop shell (Rust)                         app/src-tauri   [M2, done]
 ├── Frontend: React + TypeScript + Vite               app/src
-│   ├── Viewer pane: three.js                         [M2]
-│   ├── Terminal pane: xterm.js                       [M3]
-│   ├── Side panels: files, parameters, bodies, problems
-│   └── Export dialog                                 [M4]
-├── Rust backend                                      [M2]
-│   ├── PTY sessions (portable-pty) <-> xterm.js
-│   ├── File watcher (notify, ~300 ms debounce)
-│   └── Runs cadkit as a subprocess, with a timeout
-└── Python package: cadkit                            cadkit/  [M1, done]
+│   ├── Viewer pane: three.js                         app/src/viewer  [M2, done]
+│   ├── Terminal pane: xterm.js                                       [M3]
+│   ├── Side panels: files, parameters (read-only until M3), bodies
+│   └── Export dialog                                                 [M4]
+├── Rust backend                                      app/src-tauri/src
+│   ├── PTY sessions (portable-pty) <-> xterm.js                      [M3]
+│   ├── File watcher (notify, 300 ms debounce)        lib.rs
+│   └── CAD engine: one `python -m cadkit serve`      engine.rs
+└── Python package: cadkit                            cadkit/         [M1, done]
     ├── build   -> per-body GLB + .cad/manifest.json
     ├── check   -> problems as text or JSON
-    └── export  -> STEP / STL / 3MF
+    ├── export  -> STEP / STL / 3MF
+    ├── info    -> project name, profile, parameters, files
+    └── serve   -> long-lived JSON-lines worker for the app
 ```
+
+## The rebuild loop (M2)
+
+1. The Rust watcher sees a change to `*.py`, `*.toml` or `boards/**`, waits for 300 ms of quiet, then emits `files-changed`. It ignores `.cad/`, `__pycache__/` and `.git/`, so builds can't trigger themselves.
+2. The UI asks for `projectInfo()`, to refresh the parameters and file list, then `build()`. An edit that arrives during a build queues exactly one more build.
+3. Rust forwards the build to the running `cadkit serve` process. It returns the manifest JSON, and the UI loads each body's GLB through `loadAsset()`.
+4. The viewer swaps all bodies at once and keeps the camera where it was. A failed build keeps the last good model on screen and shows the traceback in the Build log.
+
+On the enclosure template, a rebuild takes about 0.8 s, about 1.1 s from saving the file to the view updating.
 
 ## Key decisions
 
 **All CAD work happens in cadkit.** The desktop app only orchestrates and displays. The app calls the same CLI an agent would, so the two cannot drift apart.
 
-**The model runs in a worker process.** `cadkit <command>` writes a request file to `.cad/tmp/` and starts `python -m cadkit.worker` with a timeout. The worker imports `model.py`, runs `build(params)` and the requested operation, and writes a JSON result. A script that hangs, crashes or prints noise never affects the CLI's output or the app. Everything the script printed comes back in the result's `log` field, for the Build log tab.
+**The model runs in a worker process.** From the command line, `cadkit <command>` writes a request file to `.cad/tmp/` and starts `python -m cadkit.worker` with a timeout. The worker imports `model.py`, runs `build(params)` and the requested operation, and writes a JSON result. A script that hangs, crashes or prints noise never affects the CLI's output. Everything the script printed comes back in the result's `log` field, for the Build log tab.
+
+**The desktop app keeps one worker alive (decided in M2).** Importing build123d takes about 3 s, longer than the 2 s rebuild target on its own. So the app starts one `python -m cadkit serve` process, which imports build123d once and then answers JSON-lines requests. Each request runs the same `execute()` code as the CLI worker, with the project's modules reloaded, so the results are identical. Rust enforces the timeout (30 s for builds, 120 s for exports) by killing the worker. The next request starts a fresh one. Stray C-level output is sent to stderr, so stdout carries only protocol lines.
+
+**Finding Python (v1 requires the user to install it).** In order: `CADORPHIN_PYTHON`, then the repo's `.venv` (debug builds only), then `python` (Windows) or `python3` on `PATH`. If the engine can't start, the welcome screen shows what was tried and how to fix it.
+
+**Coordinates.** cadkit's GLBs are in metres with a Y-up root rotation, as glTF requires. The viewer undoes both, so the whole scene is Z-up millimetres, matching the model, the manifest and the problem locations.
 
 **The frontend does not depend on Tauri.** Every frontend-to-backend call goes through the `Backend` interface in `app/src/backend/types.ts`. Components get it from `useBackend()`. Only files in `app/src/backend/` may import `@tauri-apps/*`, and an ESLint rule enforces this. A later browser version can swap in a `WebSocketBackend` without UI changes. Message shapes are cadkit's JSON output, unchanged.
 
