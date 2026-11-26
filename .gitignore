@@ -1,0 +1,27 @@
+# Local tool caches and envs (kept inside the repo so nothing lands on the system drive)
+.cache/
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.egg-info/
+.pytest_cache/
+build/
+dist/
+
+# Node / frontend
+node_modules/
+app/dist/
+
+# Rust / Tauri (M2)
+target/
+
+# cadkit generated output
+.cad/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

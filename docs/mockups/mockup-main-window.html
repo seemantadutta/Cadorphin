@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cad-studio — main window mockup (static)</title>
+<!-- Static UI mockup for reference only. Buttons and inputs are not wired up;
+     the 3D view is a placeholder drawing. Layout: top bar, left sidebar (files, parameters, bodies),
+     center viewer with toolbar, bottom terminal pane with tabs, status bar. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0;background:#0F1115}
+a{color:#7DD3C0}a:hover{color:#A7E8DA}
+button{font-family:inherit;cursor:pointer}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+</style>
+</head>
+<body>
+<div style="min-height: 900px; display: flex; flex-direction: column; background: #0F1115; color: #E6E8EC; font-family: Inter, system-ui, sans-serif; font-size: 13px">
+
+<header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid #23262E; background: #14171C">
+<div style="display: flex; align-items: center; gap: 10px">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7DD3C0" stroke-width="1.8" aria-hidden="true"><path d="M12 2 21 7v10l-9 5-9-5V7z"/><path d="M3 7l9 5 9-5M12 12v10"/></svg>
+<span style="font-weight: 600; font-size: 14px">cad-studio</span>
+<span style="color: #9AA0AA">/</span>
+<span class="mono" style="color: #C9CDD4">feather-s3-enclosure</span>
+</div>
+<div style="flex: 1 1 auto"></div>
+<div style="display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px; background: #12302A; color: #7DD3C0; font-size: 12px">
+<span style="width: 8px; height: 8px; border-radius: 50%; background: #34D399"></span>Built 1.4 s ago · watertight
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 6px">
+<button style="height: 34px; padding: 0 12px; border-radius: 6px; border: 1px solid #2F333C; background: #1B1F26; color: #E6E8EC">Check</button>
+<button style="height: 34px; padding: 0 14px; border-radius: 6px; border: 0; background: #7DD3C0; color: #0B2A24; font-weight: 600">Export…</button>
+</div>
+</header>
+
+<div style="flex: 1 1 auto; display: flex; flex-wrap: wrap; min-height: 0">
+
+<aside style="flex: 1 1 240px; max-width: 280px; min-width: 220px; border-right: 1px solid #23262E; background: #12151A; padding: 14px 12px; display: flex; flex-direction: column; gap: 18px">
+<section>
+<h2 style="margin: 0 0 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; color: #9AA0AA">PROJECT</h2>
+<div class="mono" style="display: flex; flex-direction: column; gap: 2px; font-size: 12px">
+<div style="padding: 6px 8px; border-radius: 4px; background: #1F2A2F; color: #E6E8EC">model.py</div>
+<div style="padding: 6px 8px; color: #C9CDD4">CLAUDE.md</div>
+<div style="padding: 6px 8px; color: #C9CDD4">params.toml</div>
+<div style="padding: 6px 8px; color: #C9CDD4">project.toml</div>
+<div style="padding: 6px 8px; color: #C9CDD4">boards/feather_esp32s3.py</div>
+<div style="padding: 6px 8px; color: #9AA0AA">.cad/out/model.step</div>
+<div style="padding: 6px 8px; color: #9AA0AA">.cad/out/model.3mf</div>
+</div>
+</section>
+<section>
+<h2 style="margin: 0 0 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; color: #9AA0AA">PARAMETERS</h2>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<label style="display: flex; justify-content: space-between; align-items: center; gap: 8px; color: #C9CDD4">Wall<input class="mono" value="2.2 mm" style="width: 84px; padding: 6px 8px; border-radius: 4px; border: 1px solid #2F333C; background: #0F1115; color: #E6E8EC; font-size: 12px"></label>
+<label style="display: flex; justify-content: space-between; align-items: center; gap: 8px; color: #C9CDD4">Lid thickness<input class="mono" value="2.0 mm" style="width: 84px; padding: 6px 8px; border-radius: 4px; border: 1px solid #2F333C; background: #0F1115; color: #E6E8EC; font-size: 12px"></label>
+<label style="display: flex; justify-content: space-between; align-items: center; gap: 8px; color: #C9CDD4">Fit clearance<input class="mono" value="0.25 mm" style="width: 84px; padding: 6px 8px; border-radius: 4px; border: 1px solid #2F333C; background: #0F1115; color: #E6E8EC; font-size: 12px"></label>
+<label style="display: flex; justify-content: space-between; align-items: center; gap: 8px; color: #C9CDD4">M2.5 pilot hole<input class="mono" value="3.3 mm" style="width: 84px; padding: 6px 8px; border-radius: 4px; border: 1px solid #2F333C; background: #0F1115; color: #E6E8EC; font-size: 12px"></label>
+</div>
+</section>
+<section>
+<h2 style="margin: 0 0 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; color: #9AA0AA">BODIES</h2>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; align-items: center; gap: 8px"><span style="width: 12px; height: 12px; border-radius: 3px; background: #3A3F4A; border: 1px solid #6B7280"></span><span style="flex: 1">case</span><span style="color: #9AA0AA; font-size: 12px">PETG</span></div>
+<div style="display: flex; align-items: center; gap: 8px"><span style="width: 12px; height: 12px; border-radius: 3px; background: #CFEFF7; border: 1px solid #7FB7C6"></span><span style="flex: 1">light_pipe</span><span style="color: #9AA0AA; font-size: 12px">Clear PETG</span></div>
+<div style="display: flex; align-items: center; gap: 8px"><span style="width: 12px; height: 12px; border-radius: 3px; background: #F59E5B; border: 1px solid #C2702E"></span><span style="flex: 1">button</span><span style="color: #9AA0AA; font-size: 12px">TPU</span></div>
+</div>
+</section>
+</aside>
+
+<main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 12px; border-bottom: 1px solid #23262E; background: #14171C">
+<button style="height: 30px; padding: 0 10px; border-radius: 5px; border: 1px solid #2F333C; background: #1F2A2F; color: #E6E8EC">Iso</button>
+<button style="height: 30px; padding: 0 10px; border-radius: 5px; border: 1px solid #2F333C; background: transparent; color: #C9CDD4">Top</button>
+<button style="height: 30px; padding: 0 10px; border-radius: 5px; border: 1px solid #2F333C; background: transparent; color: #C9CDD4">Front</button>
+<span style="width: 1px; height: 20px; background: #2F333C; margin: 0 4px"></span>
+<div role="group" aria-label="Projection" style="display: flex; border: 1px solid #2F333C; border-radius: 5px; overflow: hidden">
+<button aria-pressed="false" style="height: 30px; padding: 0 10px; border: 0; background: transparent; color: #C9CDD4">Perspective</button>
+<button aria-pressed="true" style="height: 30px; padding: 0 10px; border: 0; border-left: 1px solid #2F333C; background: #1F2A2F; color: #E6E8EC">Orthographic</button>
+</div>
+<span style="width: 1px; height: 20px; background: #2F333C; margin: 0 4px"></span>
+<button style="height: 30px; padding: 0 10px; border-radius: 5px; border: 1px solid #2F333C; background: transparent; color: #C9CDD4">Fit</button>
+<button style="height: 30px; padding: 0 10px; border-radius: 5px; border: 1px solid #2F333C; background: transparent; color: #C9CDD4">Section</button>
+<button style="height: 30px; padding: 0 10px; border-radius: 5px; border: 1px solid #2F333C; background: transparent; color: #C9CDD4">Measure</button>
+<button style="height: 30px; padding: 0 10px; border-radius: 5px; border: 1px solid #2F333C; background: transparent; color: #C9CDD4">Exploded</button>
+<div style="flex: 1 1 auto"></div>
+<span class="mono" style="color: #9AA0AA; font-size: 12px">72.0 × 34.0 × 22.4 mm</span>
+</div>
+
+<div style="flex: 1 1 auto; min-height: 380px; position: relative; display: flex; align-items: center; justify-content: center; background: #0B0D10">
+<svg viewBox="0 0 520 340" style="width: 100%; max-width: 640px; height: auto" role="img" aria-label="Isometric view of a two-part enclosure with lid lifted, light pipe and TPU button">
+<g stroke="#1C2027" stroke-width="1" fill="none"><path d="M40 300 L260 190 L480 300"/><path d="M90 325 L260 240 L430 325"/><path d="M150 330 L260 275 L370 330"/></g>
+<polygon points="140,210 260,150 400,220 280,280" fill="#2A2E36" stroke="#4B5160"/>
+<polygon points="140,210 280,280 280,320 140,250" fill="#22262D" stroke="#4B5160"/>
+<polygon points="280,280 400,220 400,260 280,320" fill="#1A1D23" stroke="#4B5160"/>
+<g opacity="0.95"><polygon points="140,140 260,80 400,150 280,210" fill="#3A3F4A" stroke="#6B7280"/>
+<polygon points="140,140 280,210 280,222 140,152" fill="#2F333C" stroke="#6B7280"/>
+<polygon points="280,210 400,150 400,162 280,222" fill="#262A31" stroke="#6B7280"/>
+<ellipse cx="320" cy="150" rx="11" ry="6" fill="#CFEFF7" stroke="#7FB7C6"/>
+<rect x="222" y="122" width="34" height="18" rx="5" transform="rotate(26.5 239 131)" fill="#F59E5B" stroke="#C2702E"/></g>
+<line x1="270" y1="228" x2="270" y2="268" stroke="#7DD3C0" stroke-dasharray="4 4"/>
+</svg>
+<div style="position: absolute; top: 12px; left: 12px; padding: 6px 10px; border-radius: 6px; background: rgba(20,23,28,0.9); border: 1px solid #23262E; color: #9AA0AA; font-size: 12px">Left-drag to rotate · Right- or Shift-drag to pan · Scroll to zoom · Double-click to set the orbit point</div>
+<div style="position: absolute; right: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 4px; padding: 8px; border-radius: 8px; background: rgba(20,23,28,0.9); border: 1px solid #23262E; font-size: 11px">
+<span style="color: #F87171">X</span><span style="color: #34D399">Y</span><span style="color: #60A5FA">Z</span>
+</div>
+</div>
+
+<section style="flex: 0 0 auto; border-top: 1px solid #23262E; background: #0D0F12">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 6px 10px; border-bottom: 1px solid #1C2027">
+<button style="height: 30px; padding: 0 12px; border-radius: 5px 5px 0 0; border: 0; border-bottom: 2px solid #7DD3C0; background: transparent; color: #E6E8EC">Terminal · claude</button>
+<button style="height: 30px; padding: 0 12px; border: 0; background: transparent; color: #9AA0AA">Build log</button>
+<button style="height: 30px; padding: 0 12px; border: 0; background: transparent; color: #9AA0AA">Problems (0)</button>
+<div style="flex: 1 1 auto"></div>
+<span style="color: #9AA0AA; font-size: 12px">Agent: Claude Code ▾</span>
+</div>
+<div class="mono" style="padding: 12px 16px 16px; font-size: 12.5px; line-height: 1.65; color: #C9CDD4">
+<div><span style="color: #7DD3C0">❯</span> Make the lid 2 mm thick and add a clear light pipe over the status LED</div>
+<div style="color: #9AA0AA">● Read boards/feather_esp32s3.py — LED at (18.4, 9.1)</div>
+<div style="color: #9AA0AA">● Edited params.toml (lid_t 1.6 → 2.0) and model.py (new light_pipe body)</div>
+<div style="color: #34D399">● Ran cadkit check --full — ✓ 3 bodies · valid · fits plate · no overlaps</div>
+<div>Light pipe is a 3 mm clear PETG body. Want a TPU cap over the reset button next?</div>
+<div><span style="color: #7DD3C0">❯</span> <span style="display: inline-block; width: 8px; height: 15px; background: #C9CDD4; vertical-align: text-bottom"></span></div>
+</div>
+</section>
+</main>
+</div>
+
+<footer class="mono" style="display: flex; flex-wrap: wrap; gap: 16px; padding: 6px 16px; border-top: 1px solid #23262E; background: #14171C; color: #9AA0AA; font-size: 11.5px">
+<span>● Watching model.py, params.toml</span><span>cadkit · build123d</span><span>Profile: generic-256</span><span>Units: mm</span>
+</footer>
+</div>
+</body>
+</html>
