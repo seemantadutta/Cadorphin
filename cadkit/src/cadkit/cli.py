@@ -168,6 +168,30 @@ def cmd_new(a: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_info(a: argparse.Namespace) -> int:
+    """Project summary. Runs in-process: it reads files but never runs model.py."""
+    from .worker import execute
+
+    res = execute({"op": "info", "project": a.path})
+    if a.json:
+        print(json.dumps(res, indent=2))
+    elif not res["ok"]:
+        print(f"Error: {res['errors'][0]}", file=sys.stderr)
+    else:
+        prof = res["profile"]
+        print(f"{res['name']}  ({res['root']})")
+        print(f"Profile: {prof['id']} ({prof['name']}, {' x '.join(f'{v:g}' for v in prof['build_volume_mm'])} mm)")
+        print(f"Parameters: {', '.join(p['name'] for p in res['params']) or 'none'}")
+        print(f"Files: {', '.join(res['files'])}")
+    return int(res["exit_code"])
+
+
+def cmd_serve(a: argparse.Namespace) -> int:
+    from .serve import main as serve_main
+
+    return serve_main()
+
+
 def cmd_profiles(a: argparse.Namespace) -> int:
     from .project import list_profiles, load_profile
 
@@ -221,6 +245,14 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("profiles", help="list printer profiles")
     common(p, path=False)
     p.set_defaults(func=cmd_profiles)
+
+    p = sub.add_parser("info", help="show project name, profile, parameters and files (does not run model.py)")
+    p.add_argument("path", nargs="?", default=".", help="project folder (default: current folder)")
+    common(p, path=False)
+    p.set_defaults(func=cmd_info)
+
+    p = sub.add_parser("serve", help="long-lived JSON-lines worker used by the desktop app")
+    p.set_defaults(func=cmd_serve)
     return ap
 
 

@@ -43,12 +43,26 @@ def _format_script_traceback(exc: BaseException, project_root: Path) -> str:
     return "".join(lines).rstrip()
 
 
+def _forget_project_modules(root: Path) -> None:
+    sys.modules.pop("model", None)
+    for name, mod in list(sys.modules.items()):
+        f = getattr(mod, "__file__", None)
+        if f:
+            try:
+                if Path(f).resolve().is_relative_to(root):
+                    del sys.modules[name]
+            except (OSError, ValueError):
+                pass
+    importlib.invalidate_caches()
+
+
 def run_model(project: Project) -> dict[str, Body]:
     try:
         params = load_params(project.root / "params.toml")
     except ParamError as e:
         raise ScriptError(str(e)) from None
 
+    _forget_project_modules(project.root)  # a long-lived worker (cadkit serve) must see fresh edits
     sys.path.insert(0, str(project.root))  # so model.py can import boards/ and helpers
     try:
         spec = importlib.util.spec_from_file_location("model", project.model_path)
@@ -154,7 +168,40 @@ def op_export(project: Project, bodies: dict[str, Body], req: dict[str, Any], re
 OPS = {"build": op_build, "check": op_check, "export": op_export}
 
 
+PROJECT_FILE_GLOBS = ("*.py", "*.toml", "*.md", "boards/**/*")
+
+
+def project_info(project: Project) -> dict[str, Any]:
+    """What the app needs to show a project: name, profile, parameters, files."""
+    from .params import load_params
+
+    files = sorted(
+        {p.relative_to(project.root).as_posix() for g in PROJECT_FILE_GLOBS for p in project.root.glob(g) if p.is_file()}
+    )
+    try:
+        params = [s.to_json() for s in load_params(project.root / "params.toml").specs.values()]
+        params_error = None
+    except ParamError as e:
+        params, params_error = [], str(e)
+    prof = project.profile
+    return {
+        "root": str(project.root),
+        "name": project.name,
+        "units": project.units,
+        "profile": {"id": prof.id, "name": prof.name, "build_volume_mm": list(prof.build_volume_mm), "plate_mm": list(prof.plate_mm)},
+        "params": params,
+        "params_error": params_error,
+        "files": files,
+    }
+
+
 def execute(req: dict[str, Any]) -> dict[str, Any]:
+    if req["op"] == "info":
+        try:
+            info = project_info(load_project(req["project"]))
+            return {"ok": True, "op": "info", "exit_code": EXIT_OK, **info}
+        except ProjectError as e:
+            return {"ok": False, "op": "info", "exit_code": EXIT_SCRIPT_ERROR, "errors": [str(e)]}
     t0 = time.perf_counter()
     res: dict[str, Any] = {"ok": False, "op": req["op"], "bodies": [], "problems": [], "errors": [], "notes": [], "files": []}
     try:

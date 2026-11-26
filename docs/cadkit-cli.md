@@ -91,6 +91,29 @@ Runs the fast checks first. If there are errors, nothing is exported and the exi
 
 Lists the printer profiles. See [profiles.md](profiles.md).
 
+## `cadkit info [path]`
+
+Prints the project name, printer profile, parameters (with their `unit`, `min`, `max`, `label` and `group`) and the project files. It reads files but never runs `model.py`. With `--json`:
+
+```json
+{"ok": true, "root": "/path/demo", "name": "demo", "units": "mm",
+ "profile": {"id": "generic-256", "name": "Generic 256", "build_volume_mm": [256, 256, 256], "plate_mm": [256, 256]},
+ "params": [{"name": "wall", "value": 2.2, "unit": "mm", "min": 1.2, "max": 5, "label": "Wall thickness", "group": "Case"}],
+ "params_error": null,
+ "files": ["AGENTS.md", "CLAUDE.md", "model.py", "params.toml", "project.toml"]}
+```
+
+## `cadkit serve`
+
+A long-lived worker for the desktop app. Importing build123d takes about 3 s, so the app starts this once and sends it requests, instead of paying that cost on every rebuild.
+
+- It reads one JSON request per line on stdin: `{"id": 1, "op": "build" | "check" | "export" | "info" | "shutdown", "project": "<path>", ...}`. Other fields are the same options as the matching command, e.g. `"quality"`, `"level"`, `"format"`, `"out"` or `"force"`.
+- It writes one line per request on stdout: `{"id": 1, "result": {...}}`. The result is the same JSON the matching command prints with `--json`. If the request itself is malformed, it writes `{"id": 1, "error": "..."}` instead.
+- The first line it writes is `{"ready": true, "cadkit": "...", "build123d": "...", "startup_ms": ...}`.
+- It handles requests one at a time. Project modules are reloaded for every request, so edits to `model.py` and helper modules always take effect.
+- The caller enforces timeouts by killing the process.
+- It exits on `shutdown` or when stdin closes.
+
 ## The `model.py` contract
 
 ```python
