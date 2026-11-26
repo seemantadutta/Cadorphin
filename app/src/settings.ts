@@ -2,8 +2,28 @@ import type { ControlsMode, Projection } from "./viewer/Viewer";
 
 export type ThemeChoice = "system" | "light" | "dark";
 
+/** The agent a project uses (see terminal/agents.ts), and the session to resume when it reopens. */
+export interface ProjectAgent {
+  /** "claude", "codex", ... or "custom:<command>". */
+  agent: string;
+  /** Claude Code only: the session id the app started it with. */
+  sessionId?: string;
+}
+
 interface Settings {
   lastProject: string | null;
+  /** Most recent first. Shown on the start screen. */
+  recentProjects: string[];
+  /** Where the New Project dialog creates projects. */
+  projectsDir: string | null;
+  /** The printer the New Project dialog suggests. */
+  lastPrinter: string;
+  /** Ask before leaving a project closes terminals the user has worked in. */
+  confirmCloseTerminals: boolean;
+  /** The agent id the New Project dialog suggests ("" = a plain terminal). */
+  newProjectAgent: string;
+  /** Per project folder (see projectKey). Per user and machine, so not stored in the project. */
+  projectAgents: Record<string, ProjectAgent>;
   controls: ControlsMode;
   projection: Projection;
   theme: ThemeChoice;
@@ -16,6 +36,12 @@ interface Settings {
 
 const DEFAULTS: Settings = {
   lastProject: null,
+  recentProjects: [],
+  projectsDir: null,
+  lastPrinter: "generic-256",
+  newProjectAgent: "",
+  confirmCloseTerminals: true,
+  projectAgents: {},
   controls: "orbit",
   projection: "perspective",
   theme: "system",
@@ -36,6 +62,11 @@ function load(): Settings {
 }
 
 let current = load();
+
+/** Key for per-project settings: Windows paths are case-insensitive and may use either separator. */
+export function projectKey(root: string) {
+  return root.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+}
 
 /** Small per-user UI preferences. Storage can be unavailable; defaults are always safe. */
 export const settings = {

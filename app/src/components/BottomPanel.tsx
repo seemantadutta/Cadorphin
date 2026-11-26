@@ -11,6 +11,8 @@ export interface TermTab {
   label: string;
   command?: string;
   exited: boolean;
+  /** The user typed in it, or it was started with a command: closing it may interrupt work. */
+  used: boolean;
 }
 
 /** "log", "problems", or "term:<key>". */
@@ -26,8 +28,11 @@ interface Props {
   onTab: (t: BottomTab) => void;
   onToggle: () => void;
   onNewTerminal: (command?: string, label?: string) => void;
+  /** Starts a known agent (terminal/agents.ts) with a new session; it becomes the project's agent. */
+  onStartAgent: (id: string) => void;
   onCloseTerminal: (key: string) => void;
   onTerminalExit: (key: string) => void;
+  onTerminalInput: (key: string) => void;
   onTerminalError: (message: string) => void;
 }
 
@@ -124,7 +129,14 @@ export function BottomPanel(props: Props) {
               <div className="menu-sep" />
               <div className="menu-label">Start an agent in a new terminal</div>
               {KNOWN_AGENTS.map((a) => (
-                <button key={a.command} role="menuitem" onClick={() => launch(a.command, a.command)}>
+                <button
+                  key={a.id}
+                  role="menuitem"
+                  onClick={() => {
+                    setMenu(false);
+                    props.onStartAgent(a.id);
+                  }}
+                >
                   {a.label} <span className="mono muted">{a.command}</span>
                 </button>
               ))}
@@ -176,6 +188,7 @@ export function BottomPanel(props: Props) {
             theme={theme}
             onReady={() => {}}
             onExit={() => props.onTerminalExit(t.key)}
+            onFirstInput={() => props.onTerminalInput(t.key)}
             onError={props.onTerminalError}
           />
         ))}

@@ -42,7 +42,14 @@ npm install
 npm run tauri dev        # then "Open folder…" on the welcome screen
 ```
 
-To open a project straight away, set `CADORPHIN_PROJECT` to its folder before running. The app also reopens the last project you used.
+To open a project straight away, set `CADORPHIN_PROJECT` to its folder. The repo includes a small demo, an open box with rounded corners:
+
+```sh
+CADORPHIN_PROJECT="$PWD/../examples/demo" npm run tauri dev               # macOS / Linux
+$env:CADORPHIN_PROJECT = "$PWD\..\examples\demo"; npm run tauri dev       # Windows PowerShell
+```
+
+The app also reopens the last project you used. To start on the start screen instead, set `CADORPHIN_NO_PROJECT=1` (or pass `--no-project`). Keep your own projects outside this repository; **File → New Project…** remembers the folder you create them in.
 
 The app watches the project folder and rebuilds whenever a file is saved, whether by you, your editor or your agent. Development builds use the repo's `.venv`. To use another Python, set `CADORPHIN_PYTHON`. `npm run dev` alone shows the UI in a browser with fixture data.
 

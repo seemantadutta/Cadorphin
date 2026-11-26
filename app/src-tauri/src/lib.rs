@@ -2,6 +2,7 @@
 //! watches the project folder and serves files to the UI. All CAD work happens in cadkit.
 
 mod engine;
+mod reaper;
 mod terminal;
 
 use std::path::{Path, PathBuf};
@@ -11,7 +12,8 @@ use std::time::Duration;
 use notify_debouncer_mini::notify::{RecommendedWatcher, RecursiveMode};
 use notify_debouncer_mini::{new_debouncer, DebounceEventResult, Debouncer};
 use serde_json::{json, Value};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::menu::{MenuBuilder, MenuItem, MenuItemBuilder, SubmenuBuilder};
+use tauri::{AppHandle, Emitter, Manager, Wry};
 
 use engine::{Engine, EngineError, PythonCmd};
 use terminal::Terminals;
@@ -20,6 +22,17 @@ const BUILD_TIMEOUT: Duration = Duration::from_secs(30);
 const EXPORT_TIMEOUT: Duration = Duration::from_secs(120);
 const WATCH_DEBOUNCE: Duration = Duration::from_millis(300);
 const IGNORED_DIRS: &[&str] = &[".cad", "__pycache__", ".git", ".venv", "node_modules"];
+
+/// Menu items whose enabled state follows the app (e.g. Close Project needs an open project).
+struct MenuState {
+    close_project: MenuItem<Wry>,
+}
+
+fn set_project_menu(app: &AppHandle, open: bool) {
+    if let Some(m) = app.try_state::<MenuState>() {
+        let _ = m.close_project.set_enabled(open);
+    }
+}
 
 struct AppState {
     python: PythonCmd,
@@ -152,7 +165,116 @@ async fn open_project(app: AppHandle, path: String) -> Result<Value, String> {
         *state.watcher.lock().unwrap() = None; // stop watching the previous project
         *state.project.lock().unwrap() = Some(root.clone());
         *state.watcher.lock().unwrap() = Some(start_watcher(&app, &root)?);
+        set_project_menu(&app, true);
         Ok(info)
+    })
+    .await
+}
+
+/// Stops watching the project and forgets it. The UI closes the project's terminals itself.
+#[tauri::command]
+fn close_project(app: AppHandle) {
+    let state = app.state::<AppState>();
+    *state.watcher.lock().unwrap() = None;
+    *state.project.lock().unwrap() = None;
+    set_project_menu(&app, false);
+}
+
+/// Project templates for the New Project dialog (`[{id, description}]`).
+#[tauri::command]
+async fn list_templates(app: AppHandle) -> Result<Value, String> {
+    blocking(move || {
+        let res = engine_request(&app, json!({"op": "templates"}), BUILD_TIMEOUT)?;
+        Ok(res["templates"].clone())
+    })
+    .await
+}
+
+fn is_uuid(s: &str) -> bool {
+    s.len() == 36
+        && s.chars().enumerate().all(|(i, c)| if [8, 13, 18, 23].contains(&i) { c == '-' } else { c.is_ascii_hexdigit() })
+}
+
+/// Claude Code's folder name for a working directory's sessions: every character that is not an
+/// ASCII letter or digit becomes `-` (D:\a\b becomes D--a-b).
+fn claude_project_dir_name(cwd: &str) -> String {
+    cwd.chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '-' }).collect()
+}
+
+/// Ids of the Claude Code sessions saved for `cwd`, newest first. Claude keeps each one as
+/// `<config>/projects/<folder name>/<id>.jsonl`, where the config folder is CLAUDE_CONFIG_DIR or
+/// ~/.claude. Read-only. The UI uses it to resume a project's conversation.
+#[tauri::command]
+fn claude_sessions(app: AppHandle, cwd: String) -> Vec<String> {
+    let config = match std::env::var_os("CLAUDE_CONFIG_DIR") {
+        Some(dir) => PathBuf::from(dir),
+        None => match app.path().home_dir() {
+            Ok(home) => home.join(".claude"),
+            Err(_) => return vec![],
+        },
+    };
+    let want = claude_project_dir_name(cwd.trim_end_matches(['\\', '/']));
+    let Ok(dirs) = std::fs::read_dir(config.join("projects")) else { return vec![] };
+    // Match the folder name case-insensitively: Windows paths can arrive in either case.
+    let Some(dir) = dirs.flatten().map(|d| d.path()).find(|p| {
+        p.file_name().map(|n| n.to_string_lossy().eq_ignore_ascii_case(&want)).unwrap_or(false)
+    }) else {
+        return vec![];
+    };
+    let mut sessions: Vec<(std::time::SystemTime, String)> = std::fs::read_dir(dir)
+        .map(|entries| {
+            entries
+                .flatten()
+                .filter_map(|e| {
+                    let path = e.path();
+                    let id = path.file_stem()?.to_str()?.to_string();
+                    if path.extension()? != "jsonl" || !is_uuid(&id) {
+                        return None;
+                    }
+                    Some((e.metadata().ok()?.modified().ok()?, id))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    sessions.sort_by_key(|s| std::cmp::Reverse(s.0));
+    sessions.into_iter().map(|(_, id)| id).collect()
+}
+
+/// A folder name that is safe to create on every OS: no separators, reserved characters or dots-only.
+fn valid_folder_name(name: &str) -> Result<&str, String> {
+    let name = name.trim();
+    if name.is_empty() || name == "." || name == ".." {
+        return Err("Enter a name for the project folder".into());
+    }
+    if let Some(c) = name.chars().find(|c| r#"\/:*?"<>|"#.contains(*c) || c.is_control()) {
+        return Err(format!("A folder name cannot contain '{c}'"));
+    }
+    if name.ends_with('.') || name.ends_with(' ') {
+        return Err("A folder name cannot end with a dot or a space".into());
+    }
+    Ok(name)
+}
+
+/// Creates `<parent>/<name>` from a template (`cadkit new`) and returns its path. The UI then opens it.
+/// `description`, if given, is added to the agent instruction files as a design brief.
+#[tauri::command]
+async fn create_project(
+    app: AppHandle,
+    parent: String,
+    name: String,
+    template: String,
+    profile: String,
+    description: Option<String>,
+) -> Result<String, String> {
+    blocking(move || {
+        let parent = clean_path(Path::new(&parent))?;
+        let dir = parent.join(valid_folder_name(&name)?);
+        let req = json!({"op": "new", "dir": dir, "template": template, "profile": profile, "description": description});
+        let res = engine_request(&app, req, BUILD_TIMEOUT)?;
+        if res["ok"] != json!(true) {
+            return Err(res["errors"][0].as_str().unwrap_or("Could not create the project").to_string());
+        }
+        Ok(res["path"].as_str().unwrap_or_default().to_string())
     })
     .await
 }
@@ -209,6 +331,65 @@ async fn write_params(app: AppHandle, values: Value) -> Result<Value, String> {
     .await
 }
 
+/// Printer profiles: bundled ones plus the open project's own `profiles/` folder.
+#[tauri::command]
+async fn list_profiles(app: AppHandle) -> Result<Value, String> {
+    blocking(move || {
+        let root = project_root(&app).ok();
+        let res = engine_request(&app, json!({"op": "profiles", "project": root}), BUILD_TIMEOUT)?;
+        if res["ok"] != json!(true) {
+            return Err(res["errors"][0].as_str().unwrap_or("Could not list printer profiles").to_string());
+        }
+        Ok(res["profiles"].clone())
+    })
+    .await
+}
+
+/// Sets the open project's printer (`profile` in project.toml, via cadkit). As with parameters,
+/// the watcher sees the file change and the UI refreshes and rebuilds.
+#[tauri::command]
+async fn set_profile(app: AppHandle, profile: String) -> Result<Value, String> {
+    blocking(move || {
+        let root = project_root(&app)?;
+        let res = engine_request(&app, json!({"op": "set_profile", "project": root, "profile": profile}), BUILD_TIMEOUT)?;
+        if res["ok"] != json!(true) {
+            return Err(res["errors"][0].as_str().unwrap_or("Could not change the printer").to_string());
+        }
+        Ok(res["profile"].clone())
+    })
+    .await
+}
+
+/// The native menu bar. Items only emit a `menu` event with their id; the UI decides what to do.
+/// Shortcuts must not collide with keys terminal programs use (Ctrl+C, Ctrl+O, Ctrl+Q, ...), since
+/// a menu accelerator is taken before the focused terminal sees the key.
+fn build_menu(app: &tauri::App) -> tauri::Result<()> {
+    let new = MenuItemBuilder::with_id("new", "&New Project…").build(app)?;
+    let open = MenuItemBuilder::with_id("open", "&Open Project…").build(app)?;
+    let close = MenuItemBuilder::with_id("close", "&Close Project").enabled(false).build(app)?;
+    let quit = MenuItemBuilder::with_id("quit", "E&xit").build(app)?;
+    let prefs = MenuItemBuilder::with_id("preferences", "&Preferences…").accelerator("CmdOrCtrl+,").build(app)?;
+    let about = MenuItemBuilder::with_id("about", "&About Cadorphin").build(app)?;
+    let file = SubmenuBuilder::new(app, "&File").item(&new).item(&open).item(&close).separator().item(&quit).build()?;
+    let edit = SubmenuBuilder::new(app, "&Edit");
+    // macOS needs the standard edit items for copy/paste to work in text fields. Elsewhere they would
+    // grab Ctrl+C/Ctrl+V from the terminal, so they are left out.
+    #[cfg(target_os = "macos")]
+    let edit = edit.undo().redo().separator().cut().copy().paste().select_all().separator();
+    let edit = edit.item(&prefs).build()?;
+    let help = SubmenuBuilder::new(app, "&Help").item(&about).build()?;
+    let menu = MenuBuilder::new(app).items(&[&file, &edit, &help]).build()?;
+    app.set_menu(menu)?;
+    app.manage(MenuState { close_project: close });
+    app.on_menu_event(|app, event| match event.id().as_ref() {
+        "quit" => app.exit(0), // RunEvent::Exit then closes the terminals
+        id => {
+            let _ = app.emit("menu", id.to_string());
+        }
+    });
+    Ok(())
+}
+
 /// Opens the user's shell in the project folder. `command`, if given, is typed into it
 /// (used by the "+" menu's agent shortcuts); the shell stays open after it exits.
 #[tauri::command]
@@ -238,14 +419,22 @@ fn close_terminal(app: AppHandle, id: String) {
     app.state::<Terminals>().close(&id);
 }
 
-/// Project to open at startup: first command-line argument, else CADORPHIN_PROJECT.
+/// What to open at startup. `--no-project` or CADORPHIN_NO_PROJECT=1 starts on the start screen
+/// (and doesn't reopen the last project); otherwise a folder given as the first argument or in
+/// CADORPHIN_PROJECT; otherwise the UI reopens the last project.
 #[tauri::command]
-fn initial_project() -> Option<String> {
-    std::env::args()
-        .skip(1)
+fn initial_project() -> Value {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let flag = |v: Result<String, std::env::VarError>| v.map(|s| !s.is_empty() && s != "0").unwrap_or(false);
+    if args.iter().any(|a| a == "--no-project") || flag(std::env::var("CADORPHIN_NO_PROJECT")) {
+        return json!({"path": null, "restore": false});
+    }
+    let path = args
+        .into_iter()
         .find(|a| !a.starts_with('-'))
         .or_else(|| std::env::var("CADORPHIN_PROJECT").ok())
-        .filter(|p| Path::new(p).is_dir())
+        .filter(|p| Path::new(p).is_dir());
+    json!({"path": path, "restore": true})
 }
 
 #[tauri::command]
@@ -263,6 +452,7 @@ fn load_asset(app: AppHandle, path: String) -> Result<tauri::ipc::Response, Stri
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    reaper::kill_children_with_app(); // before anything starts a child process
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(AppState {
@@ -275,6 +465,10 @@ pub fn run() {
             engine_info,
             initial_project,
             open_project,
+            close_project,
+            list_templates,
+            create_project,
+            claude_sessions,
             project_info,
             build,
             check,
@@ -282,12 +476,18 @@ pub fn run() {
             read_file,
             load_asset,
             write_params,
+            list_profiles,
+            set_profile,
             open_terminal,
             write_terminal,
             resize_terminal,
             close_terminal
         ])
         .manage(Terminals::default())
+        .setup(|app| {
+            build_menu(app)?;
+            Ok(())
+        })
         .build(tauri::generate_context!())
         .expect("error while building Cadorphin")
         .run(|app, event| {
@@ -295,4 +495,34 @@ pub fn run() {
                 app.state::<Terminals>().close_all(); // don't leave shells (or agents) running
             }
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{claude_project_dir_name, is_uuid, valid_folder_name};
+
+    #[test]
+    fn claude_folder_names() {
+        assert_eq!(
+            claude_project_dir_name(r"D:\development\projects\cadprojects\XiaoEnclosure\XiaoEnclosure"),
+            "D--development-projects-cadprojects-XiaoEnclosure-XiaoEnclosure"
+        );
+        assert_eq!(claude_project_dir_name("/home/me/my_case.v2"), "-home-me-my-case-v2");
+    }
+
+    #[test]
+    fn uuids() {
+        assert!(is_uuid("8851c40f-41d0-4e8e-b379-03b91ebfb1b1"));
+        for bad in ["", "8851c40f41d04e8eb37903b91ebfb1b1", "../../../../etc/passwd-000000000000000", "8851c40f-41d0-4e8e-b379-03b91ebfb1bz"] {
+            assert!(!is_uuid(bad), "{bad:?}");
+        }
+    }
+
+    #[test]
+    fn folder_names() {
+        assert_eq!(valid_folder_name("  my-case ").unwrap(), "my-case");
+        for bad in ["", " ", ".", "..", "a/b", r"a\b", "a:b", "what?", "x.", "tab\there"] {
+            assert!(valid_folder_name(bad).is_err(), "{bad:?} should be rejected");
+        }
+    }
 }
