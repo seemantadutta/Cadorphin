@@ -153,7 +153,7 @@ def cmd_new(a: argparse.Namespace) -> int:
     from .templates import TemplateError, create_project
 
     try:
-        path = create_project(Path(a.dir), a.template, a.profile)
+        path = create_project(Path(a.dir), a.template, a.profile, a.description)
     except TemplateError as e:
         if a.json:
             print(json.dumps({"ok": False, "errors": [str(e)]}))
@@ -212,6 +212,23 @@ def cmd_set(a: argparse.Namespace) -> int:
     return int(res["exit_code"])
 
 
+def cmd_set_profile(a: argparse.Namespace) -> int:
+    """Choose the project's printer. Runs in-process; never runs model.py."""
+    from .worker import execute
+
+    res = execute({"op": "set_profile", "project": a.path, "profile": a.profile})
+    if a.json:
+        print(json.dumps(res, indent=2))
+    elif not res["ok"]:
+        print(f"Error: {res['errors'][0]}", file=sys.stderr)
+    else:
+        prof = res["profile"]
+        x, y, z = prof["build_volume_mm"]
+        out = Out()
+        out.p(f"{out.ok} Printer: {prof['name']} ({x:g} x {y:g} x {z:g} mm)")
+    return int(res["exit_code"])
+
+
 def cmd_serve(a: argparse.Namespace) -> int:
     from .serve import main as serve_main
 
@@ -265,6 +282,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("dir")
     p.add_argument("--template", default="enclosure", help="enclosure or blank (default: enclosure)")
     p.add_argument("--profile", default=None, help="printer profile id (see 'cadkit profiles')")
+    p.add_argument("--description", default=None, help="what the design is for; added to CLAUDE.md, AGENTS.md and GEMINI.md")
     common(p, path=False)
     p.set_defaults(func=cmd_new)
 
@@ -282,6 +300,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--path", default=".", help="project folder (default: current folder)")
     common(p, path=False)
     p.set_defaults(func=cmd_set)
+
+    p = sub.add_parser("set-profile", help="choose the project's printer profile, e.g. cadkit set-profile bambu-p1s")
+    p.add_argument("profile", metavar="ID", help="profile id (see 'cadkit profiles')")
+    p.add_argument("--path", default=".", help="project folder (default: current folder)")
+    common(p, path=False)
+    p.set_defaults(func=cmd_set_profile)
 
     p = sub.add_parser("serve", help="long-lived JSON-lines worker used by the desktop app")
     p.set_defaults(func=cmd_serve)

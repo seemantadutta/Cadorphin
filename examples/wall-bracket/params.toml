@@ -23,6 +23,15 @@ step = 0.5
 label = "Plate thickness"
 group = "Bracket"
 
+[chamfer]
+value = 0.8
+unit = "mm"
+min = 0
+max = 2
+step = 0.1
+label = "Edge chamfer"
+group = "Bracket"
+
 [hole_diameter]
 value = 4.5
 unit = "mm"

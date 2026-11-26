@@ -21,9 +21,9 @@ function ago(d: Date, now: number) {
   return m < 60 ? `${m} min ago` : `${Math.round(m / 60)} h ago`;
 }
 
-export function Logo() {
+export function Logo({ size = 22 }: { size?: number }) {
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.8" aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.8" aria-hidden="true">
       <path d="M12 2 21 7v10l-9 5-9-5V7z" />
       <path d="M3 7l9 5 9-5M12 12v10" />
     </svg>

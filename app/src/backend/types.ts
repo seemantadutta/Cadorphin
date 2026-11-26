@@ -18,12 +18,48 @@ export interface ParamSpec {
   group?: string;
 }
 
+/** A printer profile as `cadkit` summarises it (profiles/*.json). */
+export interface PrinterProfile {
+  id: string;
+  name: string;
+  /** Groups the printer list, e.g. "Bambu Lab" or "Generic". */
+  vendor?: string | null;
+  build_volume_mm: [number, number, number];
+  plate_mm: [number, number];
+}
+
+/** Ids the native menu sends (app/src-tauri/src/lib.rs, build_menu). */
+export type MenuId = "new" | "open" | "close" | "preferences" | "about";
+
+/** A project template for `cadkit new` (templates/). */
+export interface ProjectTemplate {
+  id: string;
+  description: string;
+}
+
+/** What to open at launch: `path` if given; else the last project, unless `restore` is false. */
+export interface StartupProject {
+  path: string | null;
+  restore: boolean;
+}
+
+export interface NewProjectOptions {
+  /** Folder the project folder is created in. */
+  parent: string;
+  /** Name of the new project folder (also the project's name). */
+  name: string;
+  template: string;
+  profile: string;
+  /** What the design is for. Added to CLAUDE.md, AGENTS.md and GEMINI.md as a "Design brief". */
+  description?: string;
+}
+
 /** Output of `cadkit info --json`. */
 export interface ProjectInfo {
   root: string;
   name: string;
   units: string;
-  profile: { id: string; name: string; build_volume_mm: [number, number, number]; plate_mm: [number, number] };
+  profile: PrinterProfile;
   params: ParamSpec[];
   params_error: string | null;
   files: string[];
@@ -106,10 +142,18 @@ export interface Backend {
   /** Starts the CAD engine if needed. Rejects with a setup message if Python/cadkit is missing. */
   engineInfo(): Promise<EngineInfo>;
   /** Project requested at launch (command line or environment), if any. */
-  initialProject(): Promise<string | null>;
+  initialProject(): Promise<StartupProject>;
   /** Asks the user for a folder. Resolves to null if they cancel. */
-  pickProjectFolder(): Promise<string | null>;
+  pickFolder(title: string, defaultPath?: string): Promise<string | null>;
+  /** Opens a project folder and watches it. Rejects if the folder is not a cadkit project. */
   openProject(path: string): Promise<ProjectInfo>;
+  /** Stops watching the open project. */
+  closeProject(): Promise<void>;
+  listTemplates(): Promise<ProjectTemplate[]>;
+  /** Ids of the Claude Code sessions saved for this folder, newest first (`claude --resume <id>` works for each). */
+  claudeSessions(cwd: string): Promise<string[]>;
+  /** Creates a project from a template (`cadkit new`) and resolves to its path. Does not open it. */
+  createProject(opts: NewProjectOptions): Promise<string>;
   /** Re-reads the open project's info (parameters, files) after a change. */
   projectInfo(): Promise<ProjectInfo>;
   onFileChanged(cb: (paths: string[]) => void): Unsubscribe;
@@ -119,6 +163,14 @@ export interface Backend {
   readFile(path: string): Promise<string>;
   /** Changes values in params.toml (via `cadkit set`). The watcher then triggers a rebuild. */
   writeParams(values: Record<string, ParamValue>): Promise<SetParamsResult>;
+  /** Bundled printer profiles plus the open project's own `profiles/` folder. */
+  listProfiles(): Promise<PrinterProfile[]>;
+  /** Sets the open project's printer (`profile` in project.toml). The watcher then refreshes and rebuilds. */
+  setProfile(id: string): Promise<PrinterProfile>;
+  /** Native menu clicks. Backends without a native menu never call `cb`. */
+  onMenu(cb: (id: MenuId) => void): Unsubscribe;
+  /** Cadorphin's own version. */
+  appVersion(): Promise<string>;
   /**
    * Opens the user's shell in a PTY (default cwd: the project folder). `command`, if given, is typed
    * into the shell after it starts; the shell stays open when the command exits.

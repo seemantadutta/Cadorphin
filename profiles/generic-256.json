@@ -1,6 +1,7 @@
 {
   "id": "generic-256",
   "name": "Generic 256",
+  "vendor": "Generic",
   "build_volume_mm": [256, 256, 256],
   "plate_mm": [256, 256],
   "nozzle_diameters_mm": [0.4],

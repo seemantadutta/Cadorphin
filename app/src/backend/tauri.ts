@@ -1,3 +1,4 @@
+import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -8,9 +9,14 @@ import type {
   CheckReport,
   EngineInfo,
   ExportResult,
+  MenuId,
+  NewProjectOptions,
   ParamValue,
+  PrinterProfile,
+  ProjectTemplate,
   ProjectInfo,
   SetParamsResult,
+  StartupProject,
   TerminalId,
   Unsubscribe,
 } from "./types";
@@ -42,6 +48,20 @@ class TerminalEvents<T> {
   }
 }
 
+/** listen() resolves asynchronously; this returns a synchronous unsubscribe that is safe to call early. */
+function subscribe<T>(event: string, cb: (payload: T) => void): Unsubscribe {
+  let stop: (() => void) | null = null;
+  let cancelled = false;
+  void listen<T>(event, (e) => cb(e.payload)).then((un) => {
+    if (cancelled) un();
+    else stop = un;
+  });
+  return () => {
+    cancelled = true;
+    stop?.();
+  };
+}
+
 /** Desktop backend: Tauri commands implemented in app/src-tauri/src/lib.rs. */
 export class TauriBackend implements Backend {
   private termData = new TerminalEvents<string>("terminal-data", (p) => p.data as string);
@@ -52,12 +72,28 @@ export class TauriBackend implements Backend {
   }
 
   initialProject() {
-    return invoke<string | null>("initial_project");
+    return invoke<StartupProject>("initial_project");
   }
 
-  async pickProjectFolder() {
-    const picked = await open({ directory: true, multiple: false, title: "Open a Cadorphin project folder" });
+  async pickFolder(title: string, defaultPath?: string) {
+    const picked = await open({ directory: true, multiple: false, title, defaultPath });
     return typeof picked === "string" ? picked : null;
+  }
+
+  closeProject() {
+    return invoke<void>("close_project");
+  }
+
+  claudeSessions(cwd: string) {
+    return invoke<string[]>("claude_sessions", { cwd });
+  }
+
+  listTemplates() {
+    return invoke<ProjectTemplate[]>("list_templates");
+  }
+
+  createProject(opts: NewProjectOptions) {
+    return invoke<string>("create_project", { ...opts, description: opts.description?.trim() || null });
   }
 
   openProject(path: string) {
@@ -69,16 +105,23 @@ export class TauriBackend implements Backend {
   }
 
   onFileChanged(cb: (paths: string[]) => void): Unsubscribe {
-    let stop: (() => void) | null = null;
-    let cancelled = false;
-    listen<string[]>("files-changed", (e) => cb(e.payload)).then((un) => {
-      if (cancelled) un();
-      else stop = un;
-    });
-    return () => {
-      cancelled = true;
-      stop?.();
-    };
+    return subscribe<string[]>("files-changed", cb);
+  }
+
+  onMenu(cb: (id: MenuId) => void): Unsubscribe {
+    return subscribe<MenuId>("menu", cb);
+  }
+
+  appVersion() {
+    return getVersion();
+  }
+
+  listProfiles() {
+    return invoke<PrinterProfile[]>("list_profiles");
+  }
+
+  setProfile(id: string) {
+    return invoke<PrinterProfile>("set_profile", { profile: id });
   }
 
   build() {

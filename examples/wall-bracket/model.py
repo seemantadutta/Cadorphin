@@ -17,6 +17,11 @@ def build(p):
         gusset = extrude(Plane.XZ * Pos(0, t) * tri, amount=t / 2, both=True)
         bracket += gusset
 
+    if p.chamfer > 0:
+        # Chamfer every edge before the holes are cut, so hole rims stay crisp.
+        c = min(p.chamfer, t * 0.45)
+        bracket = chamfer(bracket.edges(), c)
+
     for x in (a * 0.7,):
         bracket -= Pos(x, 0, 0) * Cylinder(p.hole_diameter / 2, t * 3)
     for z in (a * 0.7,):

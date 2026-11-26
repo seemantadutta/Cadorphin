@@ -1,0 +1,10 @@
+{
+  "id": "bambu-h2s",
+  "name": "Bambu Lab H2S",
+  "vendor": "Bambu Lab",
+  "build_volume_mm": [340, 320, 340],
+  "plate_mm": [340, 320],
+  "nozzle_diameters_mm": [0.2, 0.4, 0.6, 0.8],
+  "defaults": { "min_wall_mm": 1.2, "fit_clearance_mm": 0.2, "layer_height_mm": 0.2 },
+  "notes": "Single-nozzle large-format CoreXY. Volumes are from Bambu Lab's published specifications."
+}

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useBackend } from "../backend/context";
-import type { BuildManifest, CheckReport, EngineInfo, ParamValue, Problem, ProjectInfo } from "../backend/types";
+import type { BuildManifest, CheckReport, EngineInfo, NewProjectOptions, ParamValue, Problem, ProjectInfo } from "../backend/types";
 import type { ViewerBody } from "../viewer/Viewer";
 import { settings } from "../settings";
 
@@ -19,6 +19,8 @@ export interface ProjectState {
   project: ProjectInfo | null;
   openError: string | null;
   opening: boolean;
+  /** True from launch until the last project has been reopened (or there is none to reopen). */
+  starting: boolean;
   status: BuildStatus;
   manifest: BuildManifest | null;
   /** Bodies currently shown. A failed build keeps showing the last good model. */
@@ -32,6 +34,13 @@ export interface ProjectState {
 
 const DEFAULT_COLOR = "#B8BCC4";
 const MAX_LOG = 400;
+const MAX_RECENT = 8;
+
+function samePath(a: string, b: string) {
+  // Windows paths are case-insensitive and may use either separator.
+  const norm = (p: string) => p.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+  return norm(a) === norm(b);
+}
 
 export function useProject() {
   const backend = useBackend();
@@ -41,6 +50,7 @@ export function useProject() {
     project: null,
     openError: null,
     opening: false,
+    starting: true,
     status: "idle",
     manifest: null,
     viewerBodies: [],
@@ -53,6 +63,9 @@ export function useProject() {
   const building = useRef(false);
   const pending = useRef(false);
   const projectRef = useRef<ProjectInfo | null>(null);
+  /** Bumped on every open/close, so results that belong to a previous project are dropped. */
+  const generation = useRef(0);
+  const [recent, setRecent] = useState<string[]>(settings.get("recentProjects"));
 
   const patch = useCallback((p: Partial<ProjectState> | ((s: ProjectState) => Partial<ProjectState>)) => {
     setState((s) => ({ ...s, ...(typeof p === "function" ? p(s) : p) }));
@@ -71,7 +84,7 @@ export function useProject() {
     backend
       .engineInfo()
       .then((engine) => patch({ engine }))
-      .catch((e) => patch({ engineError: String(e) }));
+      .catch((e) => patch({ engineError: String(e), starting: false }));
   }, [backend, patch]);
 
   const rebuild = useCallback(async () => {
@@ -85,6 +98,7 @@ export function useProject() {
     try {
       do {
         pending.current = false;
+        const gen = generation.current;
         const t0 = performance.now();
         const manifest = await backend.build();
         if (manifest.log) log("output", manifest.log);
@@ -94,6 +108,11 @@ export function useProject() {
           viewerBodies = await Promise.all(
             shown.map(async (b) => ({ name: b.name, color: b.color ?? DEFAULT_COLOR, glb: await backend.loadAsset(b.glb!) })),
           );
+        }
+        if (gen !== generation.current) {
+          // The project was switched or closed mid-build: drop this result, build the new one.
+          pending.current = projectRef.current !== null;
+          continue;
         }
         const ms = Math.round(performance.now() - t0);
         const failed = manifest.exit_code === 2 || manifest.exit_code === 3;
@@ -115,27 +134,73 @@ export function useProject() {
     }
   }, [backend, log, patch]);
 
+  const remember = useCallback((path: string | null, root?: string) => {
+    setRecent((r) => {
+      const next = root ? [root, ...r.filter((p) => !samePath(p, root))].slice(0, MAX_RECENT) : r.filter((p) => !path || !samePath(p, path));
+      settings.set("recentProjects", next);
+      return next;
+    });
+  }, []);
+
+  /** Remove a folder from the recent list (it was moved or deleted). */
+  const forgetRecent = useCallback((path: string) => remember(path), [remember]);
+
+  const resetFor = (project: ProjectInfo | null): Partial<ProjectState> => ({
+    project,
+    viewerBodies: [],
+    manifest: null,
+    problems: [],
+    lastCheck: null,
+    lastBuiltAt: null,
+    status: "idle",
+  });
+
+  /** Open a project folder. Resolves to false (with `openError` set) if it isn't a cadkit project. */
   const openProject = useCallback(
-    async (path: string) => {
+    async (path: string): Promise<boolean> => {
       patch({ opening: true, openError: null });
       try {
         const project = await backend.openProject(path);
+        generation.current += 1;
         projectRef.current = project;
-        settings.set("lastProject", path);
-        patch({ project, opening: false, viewerBodies: [], manifest: null, problems: [], lastCheck: null, status: "idle" });
+        settings.set("lastProject", project.root);
+        remember(null, project.root);
+        patch({ ...resetFor(project), opening: false });
         log("info", `Opened ${project.root}`);
-        await rebuild();
+        void rebuild();
+        return true;
       } catch (e) {
         patch({ opening: false, openError: String(e) });
+        return false;
       }
     },
-    [backend, log, patch, rebuild],
+    [backend, log, patch, rebuild, remember],
   );
 
-  const pickAndOpen = useCallback(async () => {
-    const path = await backend.pickProjectFolder();
-    if (path) await openProject(path);
-  }, [backend, openProject]);
+  const closeProject = useCallback(async () => {
+    if (!projectRef.current) return;
+    const root = projectRef.current.root;
+    generation.current += 1;
+    projectRef.current = null;
+    settings.set("lastProject", null); // next launch starts on the start screen
+    patch({ ...resetFor(null), openError: null });
+    try {
+      await backend.closeProject();
+    } catch (e) {
+      log("error", `Closing ${root}: ${String(e)}`);
+    }
+    log("info", `Closed ${root}`);
+  }, [backend, log, patch]);
+
+  /** Create a project from a template and open it. Errors go to the caller (the dialog shows them). */
+  const createProject = useCallback(
+    async (opts: NewProjectOptions) => {
+      const path = await backend.createProject(opts);
+      log("info", `Created ${path} from the ${opts.template} template`);
+      if (!(await openProject(path))) throw new Error(`Created ${path}, but could not open it`);
+    },
+    [backend, log, openProject],
+  );
 
   const runCheck = useCallback(async () => {
     if (!projectRef.current) return;
@@ -174,6 +239,19 @@ export function useProject() {
     [backend, log, patch],
   );
 
+  /** Choose the project's printer (project.toml). The watcher then refreshes info and rebuilds. */
+  const setPrinter = useCallback(
+    async (id: string) => {
+      if (!projectRef.current) return;
+      const profile = await backend.setProfile(id); // errors go to the caller, which shows them in place
+      const [x, y, z] = profile.build_volume_mm;
+      log("info", `Printer: ${profile.name} (${x} × ${y} × ${z} mm)`);
+      projectRef.current = { ...projectRef.current, profile };
+      patch({ project: projectRef.current });
+    },
+    [backend, log, patch],
+  );
+
   // Rebuild when model files change on disk (the agent or an editor saved something).
   useEffect(() => {
     return backend.onFileChanged(async (paths) => {
@@ -198,11 +276,16 @@ export function useProject() {
     backend
       .initialProject()
       .catch(() => null)
-      .then((initial) => {
-        const path = initial ?? settings.get("lastProject");
-        if (path) void openProject(path);
-      });
-  }, [backend, state.engine, openProject]);
+      .then(async (startup) => {
+        const initial = startup?.path ?? null;
+        const path = initial ?? (startup?.restore === false ? null : settings.get("lastProject"));
+        if (path && !(await openProject(path)) && !initial) {
+          settings.set("lastProject", null); // a moved or deleted folder: start on the start screen
+          patch({ openError: null });
+        }
+      })
+      .finally(() => patch({ starting: false }));
+  }, [backend, state.engine, openProject, patch]);
 
-  return { state, openProject, pickAndOpen, rebuild, runCheck, setParam, log };
+  return { state, recent, openProject, closeProject, createProject, forgetRecent, rebuild, runCheck, setParam, setPrinter, log };
 }

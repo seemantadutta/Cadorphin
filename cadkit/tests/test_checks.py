@@ -55,7 +55,18 @@ def test_missing_build_function(make_project, cli):
 def test_bad_return_type(make_project, cli):
     code, res = cli("check", str(make_project("def build(p):\n    return 42\n")))
     assert code == 2
-    assert "must return a non-empty dict" in res["errors"][0]
+    assert "must return a dict" in res["errors"][0]
+
+
+def test_empty_model_is_valid(make_project, cli):
+    """A new project starts with nothing in it: that builds and checks cleanly, but can't be exported."""
+    root = make_project("def build(p):\n    return {}\n")
+    code, res = cli("build", str(root))
+    assert code == 0 and res["bodies"] == [] and res["problems"] == []
+    code, res = cli("check", str(root))
+    assert code == 0 and any("No bodies yet" in n for n in res["notes"])
+    code, res = cli("export", str(root), "--format", "3mf")
+    assert code == 1 and res["problems"][0]["code"] == "no_bodies" and res["files"] == []
 
 
 def test_invalid_solid_not_a_solid(make_project, cli):

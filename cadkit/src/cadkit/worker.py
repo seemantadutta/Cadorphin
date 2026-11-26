@@ -134,6 +134,8 @@ def op_check(project: Project, bodies: dict[str, Body], req: dict[str, Any], res
     bad = {p.body for p in problems if p.code in ("not_solid", "invalid_solid", "open_shell")}
     res["bodies"] = [body_info(n, b, valid=n not in bad) for n, b in bodies.items()]
     res["problems"] += [p.to_json() for p in problems]
+    if not bodies:
+        res["notes"].append("No bodies yet: build(params) returned an empty dict.")
     if req.get("level") == "full":
         res["notes"].append("Full checks (thin walls, small features, renders) are not implemented yet; ran fast checks only.")
 
@@ -142,6 +144,10 @@ def op_export(project: Project, bodies: dict[str, Body], req: dict[str, Any], re
     from .exporters import write_3mf, write_step, write_stl
 
     op_check(project, bodies, {"level": "fast"}, res)
+    if not bodies:
+        res["notes"].clear()
+        res["problems"].append(Problem("error", "no_bodies", "Nothing to export: build(params) returned no bodies").to_json())
+        return
     if any(p["severity"] == "error" for p in res["problems"]) and not req.get("force"):
         res["notes"].append("Export skipped because of errors. Fix them, or pass --force to export anyway.")
         return
@@ -188,7 +194,7 @@ def project_info(project: Project) -> dict[str, Any]:
         "root": str(project.root),
         "name": project.name,
         "units": project.units,
-        "profile": {"id": prof.id, "name": prof.name, "build_volume_mm": list(prof.build_volume_mm), "plate_mm": list(prof.plate_mm)},
+        "profile": prof.summary(),
         "params": params,
         "params_error": params_error,
         "files": files,
@@ -196,6 +202,40 @@ def project_info(project: Project) -> dict[str, Any]:
 
 
 def execute(req: dict[str, Any]) -> dict[str, Any]:
+    if req["op"] == "profiles":
+        from .project import list_profiles, load_profile
+
+        root = req.get("project")
+        profiles = [load_profile(p).summary() for p in list_profiles()]
+        if root:  # project-local profiles show up too, and win over bundled ones with the same id
+            local = Path(root) / "profiles"
+            ids = {p.stem for p in local.glob("*.json")} if local.is_dir() else set()
+            try:
+                extra = [load_profile(i, Path(root)).summary() for i in sorted(ids)]
+            except ProjectError as e:
+                return {"ok": False, "op": "profiles", "exit_code": EXIT_SCRIPT_ERROR, "errors": [str(e)]}
+            profiles = [p for p in profiles if p["id"] not in ids] + extra
+        return {"ok": True, "op": "profiles", "exit_code": EXIT_OK, "errors": [], "profiles": profiles}
+    if req["op"] == "templates":
+        from .templates import template_summaries
+
+        return {"ok": True, "op": "templates", "exit_code": EXIT_OK, "errors": [], "templates": template_summaries()}
+    if req["op"] == "new":
+        from .templates import TemplateError, create_project
+
+        try:
+            path = create_project(Path(req["dir"]), req.get("template") or "enclosure", req.get("profile"), req.get("description"))
+            return {"ok": True, "op": "new", "exit_code": EXIT_OK, "errors": [], "path": str(path)}
+        except (TemplateError, OSError) as e:
+            return {"ok": False, "op": "new", "exit_code": EXIT_SCRIPT_ERROR, "errors": [str(e)]}
+    if req["op"] == "set_profile":
+        from .project import set_profile
+
+        try:
+            prof = set_profile(req["project"], str(req.get("profile", "")))
+            return {"ok": True, "op": "set_profile", "exit_code": EXIT_OK, "errors": [], "profile": prof.summary()}
+        except ProjectError as e:
+            return {"ok": False, "op": "set_profile", "exit_code": EXIT_SCRIPT_ERROR, "errors": [str(e)]}
     if req["op"] == "set_params":
         from .params import set_params
 

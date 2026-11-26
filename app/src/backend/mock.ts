@@ -6,6 +6,9 @@ import {
   type EngineInfo,
   type ExportResult,
   type ParamValue,
+  type NewProjectOptions,
+  type PrinterProfile,
+  type ProjectTemplate,
   type ProjectInfo,
   type SetParamsResult,
   type TerminalId,
@@ -19,6 +22,21 @@ const glbUrls = import.meta.glob("./fixtures/enclosure/*.glb", { query: "?url", 
   string,
   string
 >;
+
+const PROFILES: PrinterProfile[] = [
+  ...(
+    [
+      ["bambu-a1-mini", "Bambu Lab A1 mini", 180, 180, 180],
+      ["bambu-a1", "Bambu Lab A1", 256, 256, 256],
+      ["bambu-p1s", "Bambu Lab P1S", 256, 256, 256],
+      ["bambu-x1c", "Bambu Lab X1 Carbon", 256, 256, 256],
+      ["bambu-h2d", "Bambu Lab H2D", 325, 320, 325],
+    ] as const
+  ).map(([id, name, x, y, z]) => ({ id, name, vendor: "Bambu Lab", build_volume_mm: [x, y, z], plate_mm: [x, y] }) as PrinterProfile),
+  ...[180, 220, 256, 300].map(
+    (n) => ({ id: `generic-${n}`, name: `Generic ${n}`, vendor: "Generic", build_volume_mm: [n, n, n], plate_mm: [n, n] }) as PrinterProfile,
+  ),
+];
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -80,16 +98,41 @@ export class MockBackend implements Backend {
   }
 
   async initialProject() {
-    return "/mock/demo"; // the browser preview opens the fixture project straight away
+    // The browser preview opens the fixture project straight away; add ?fresh to start empty.
+    const fresh = new URLSearchParams(location.search).has("fresh");
+    return { path: fresh ? null : "/mock/demo", restore: !fresh };
   }
 
-  async pickProjectFolder() {
+  async pickFolder() {
     return "/mock/demo";
   }
 
-  async openProject(): Promise<ProjectInfo> {
+  async openProject(path: string): Promise<ProjectInfo> {
     await delay(50);
+    if (!path.startsWith("/mock/")) throw new Error(`No model.py in ${path}. Is this a cadkit project?`);
+    const name = path.split("/").pop() || "demo";
+    this.info = { ...this.info, root: path, name };
     return this.info;
+  }
+
+  async closeProject() {}
+
+  async claudeSessions(): Promise<string[]> {
+    return [];
+  }
+
+  async listTemplates(): Promise<ProjectTemplate[]> {
+    return [
+      { id: "empty", description: "Nothing yet: an empty model for you or your agent to fill in." },
+      { id: "enclosure", description: "Two-part case with a lid, heat-set insert bosses, a USB-C cutout and a light pipe." },
+      { id: "blank", description: "A single parametric cube to start from." },
+    ];
+  }
+
+  async createProject(opts: NewProjectOptions) {
+    await delay(200);
+    // The preview has one fixture model; a "new" project shows it under the new name.
+    return `/mock/${opts.name}`;
   }
 
   async projectInfo(): Promise<ProjectInfo> {
@@ -146,6 +189,26 @@ export class MockBackend implements Backend {
     };
     setTimeout(() => this.emitFileChanged(["params.toml"]), 350); // as the real file watcher would
     return { changed: values, warnings };
+  }
+
+  async listProfiles() {
+    return PROFILES;
+  }
+
+  async setProfile(id: string): Promise<PrinterProfile> {
+    const profile = PROFILES.find((p) => p.id === id);
+    if (!profile) throw new Error(`Unknown printer profile '${id}'`);
+    this.info = { ...this.info, profile };
+    setTimeout(() => this.emitFileChanged(["project.toml"]), 350); // as the real file watcher would
+    return profile;
+  }
+
+  onMenu(): Unsubscribe {
+    return () => {}; // no native menu in the browser preview; Ctrl+, still opens Preferences
+  }
+
+  async appVersion() {
+    return "0.1.0-preview";
   }
 
   async openTerminal(opts: { command?: string }): Promise<TerminalId> {

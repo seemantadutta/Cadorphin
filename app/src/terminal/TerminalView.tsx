@@ -13,8 +13,13 @@ interface Props {
   theme: "light" | "dark";
   onReady: (id: TerminalId) => void;
   onExit: (code: number | null) => void;
+  /** Called once, on the user's first keystroke. */
+  onFirstInput?: () => void;
   onError: (message: string) => void;
 }
+
+/** Control Sequence Introducer: how xterm's automatic replies to terminal queries begin. */
+const CSI = "\x1b[";
 
 function xtermTheme(): ITheme {
   const css = getComputedStyle(document.documentElement);
@@ -40,14 +45,14 @@ function xtermTheme(): ITheme {
 }
 
 /** One terminal tab: xterm.js wired to a backend PTY running the user's shell. */
-export function TerminalView({ command, active, theme, onReady, onExit, onError }: Props) {
+export function TerminalView({ command, active, theme, onReady, onExit, onFirstInput, onError }: Props) {
   const backend = useBackend();
   const host = useRef<HTMLDivElement>(null);
   const term = useRef<Terminal | null>(null);
   const fit = useRef<FitAddon | null>(null);
   const termId = useRef<TerminalId | null>(null);
-  const callbacks = useRef({ onReady, onExit, onError });
-  callbacks.current = { onReady, onExit, onError };
+  const callbacks = useRef({ onReady, onExit, onFirstInput, onError });
+  callbacks.current = { onReady, onExit, onFirstInput, onError };
 
   useEffect(() => {
     const t = new Terminal({
@@ -87,7 +92,16 @@ export function TerminalView({ command, active, theme, onReady, onExit, onError 
             callbacks.current.onExit(code);
           }),
         );
-        const input = t.onData((d) => backend.writeTerminal(id, d));
+        let typed = false;
+        const input = t.onData((d) => {
+          backend.writeTerminal(id, d);
+          // xterm answers terminal queries (e.g. the cursor position) through onData too; only count
+          // real typing, which starts with a printable key, Enter, or a control key.
+          if (!typed && !d.startsWith(CSI)) {
+            typed = true;
+            callbacks.current.onFirstInput?.();
+          }
+        });
         const resize = t.onResize(({ cols, rows }) => backend.resizeTerminal(id, cols, rows));
         unsubs.push(() => input.dispose(), () => resize.dispose());
         backend.resizeTerminal(id, t.cols, t.rows);

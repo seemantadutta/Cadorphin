@@ -25,12 +25,40 @@ The bottom panel's terminal tabs run **the user's own shell** in a PTY (`portabl
 
 - The engine's Python scripts folder is put first on the terminal's `PATH`, so `cadkit` in the terminal is the same one the app uses.
 - Terminals stay alive while their tab is hidden or the panel is collapsed. Closing a tab, or quitting the app, kills its shell.
+- Nothing outlives the app, even when it crashes or is killed. On Windows the app joins a job object at startup that kills every process in it when the app's process ends (`reaper.rs`). Shells, the agents in them and the CAD engine all inherit it. A program started from a Cadorphin terminal therefore closes with the app, as with any terminal window. On macOS and Linux, only a clean quit closes the terminals for now.
 - Output that arrives before the UI subscribes to it is buffered and replayed. Multi-byte UTF-8 split across reads is reassembled.
 - Windows ConPTY asks the terminal for the cursor position at startup and waits for the answer. xterm.js answers automatically; the PTY test in `terminal.rs` does the same.
+
+### A project's agent
+
+The agent chosen in **New Project**, or the last one started from the terminal "+" menu, becomes the project's agent. When the project is opened again, its first terminal starts that agent and continues the previous conversation:
+
+| Agent | New conversation | Reopening the project |
+|---|---|---|
+| Claude Code | `claude --session-id <new uuid>` | `claude --resume <id>` of the newest session Claude saved for the project folder (Claude saves one after the first message); a new session if there is none |
+| Codex | `codex` | `codex resume --last` (latest session started in the project folder) |
+| Gemini CLI | `gemini` | `gemini --resume latest` (Gemini keeps sessions per folder) |
+| Aider | `aider --read AGENTS.md` | the same, plus `--restore-chat-history` |
+| Custom command | the command | the same command |
+
+Only Claude Code lets the caller choose the session id, so it is the only agent with a stored id. A project with no recorded agent still resumes Claude Code if Claude has saved sessions for its folder, so projects created before this existed, and sessions started by hand with `claude`, continue too. The project's agent and session id live in the app's per-user settings, keyed by project folder, not in the project: they are specific to this machine and shouldn't be committed. To find a folder's Claude sessions, Rust lists `<id>.jsonl` files in `CLAUDE_CONFIG_DIR` or `~/.claude`, under `projects/<folder path with every non-alphanumeric character replaced by ->`; it only reads.
 
 ## Parameters panel (M3)
 
 Editing a value calls `writeParams()`, which runs `cadkit set` in the engine. The file watcher then sees `params.toml` change and rebuilds, the same path as an agent's or an editor's edit. There's no separate "GUI changed it" route.
+
+## Menus and Preferences
+
+The native menu bar has **File** (New Project…, Open Project…, Close Project, Exit), **Edit** (Preferences…, Ctrl+,) and **Help** (About). Rust only emits a `menu` event with the item's id; the UI decides what to do. Menu shortcuts are taken before the focused terminal sees the key, so none may collide with keys terminal programs use (Ctrl+C, Ctrl+O, Ctrl+Q and so on). For the same reason the standard Cut/Copy/Paste items exist only on macOS.
+
+Preferences has three sections: **Printer**, **Appearance** (theme) and **Viewer** (mouse controls). Theme and controls are per-user UI settings in local storage. The printer is a project setting: it is `profile` in `project.toml`, written by `cadkit set-profile`, because `cadkit check` and agents in the terminal must test against the same build volume. The status bar shows it and opens Preferences when clicked.
+
+## Projects
+
+- **New Project** asks for a name, a parent folder, a template and a printer, then runs `cadkit new` in the engine and opens the result. The folder name is checked in the UI and again in Rust, which refuses separators and other characters that aren't allowed in folder names on Windows.
+- **Open Project** accepts any folder with a `model.py`. Anything else is refused with cadkit's message, and the current project stays open.
+- **Close Project** stops the file watcher and returns to the start screen, which lists recent projects (most recent first, up to 8, kept in local storage). The app reopens the last project at launch, unless it was closed.
+- Terminals belong to a project: leaving it (open, new or close) closes them, because an agent left running in the old folder would keep editing a project that is no longer on screen. If you have typed in a terminal, or started it from an agent shortcut, Cadorphin asks first. A build still running for the old project is discarded when it finishes.
 
 ## The rebuild loop (M2)
 
