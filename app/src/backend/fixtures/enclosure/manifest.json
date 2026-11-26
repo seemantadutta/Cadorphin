@@ -1,0 +1,63 @@
+{
+  "ok": true,
+  "duration_ms": 3106,
+  "bodies": [
+    {
+      "name": "case",
+      "material": "PETG",
+      "color": "#3A3F4A",
+      "bbox": [
+        72.0,
+        44.0,
+        26.0
+      ],
+      "bbox_min": [
+        -36.0,
+        -22.0,
+        0.0
+      ],
+      "volume_mm3": 20040.03,
+      "valid": true,
+      "glb": ".cad/out/case.glb"
+    },
+    {
+      "name": "lid",
+      "material": "PETG",
+      "color": "#5B6475",
+      "bbox": [
+        72.0,
+        44.0,
+        4.5
+      ],
+      "bbox_min": [
+        -36.0,
+        -22.0,
+        23.5
+      ],
+      "volume_mm3": 6760.003,
+      "valid": true,
+      "glb": ".cad/out/lid.glb"
+    },
+    {
+      "name": "light_pipe",
+      "material": "Clear PETG",
+      "color": "#CFEFF7",
+      "bbox": [
+        5.0,
+        5.0,
+        4.0
+      ],
+      "bbox_min": [
+        19.5,
+        7.5,
+        25.0
+      ],
+      "volume_mm3": 40.841,
+      "valid": true,
+      "glb": ".cad/out/light_pipe.glb"
+    }
+  ],
+  "problems": [],
+  "errors": [],
+  "profile": "generic-256"
+}

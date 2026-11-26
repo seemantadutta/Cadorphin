@@ -1,0 +1,248 @@
+{
+  "root": "/mock/demo",
+  "name": "demo",
+  "units": "mm",
+  "profile": {
+    "id": "generic-256",
+    "name": "Generic 256",
+    "build_volume_mm": [
+      256.0,
+      256.0,
+      256.0
+    ],
+    "plate_mm": [
+      256.0,
+      256.0
+    ]
+  },
+  "params": [
+    {
+      "name": "length",
+      "value": 72.0,
+      "unit": "mm",
+      "min": 40,
+      "max": 250,
+      "label": "Outer length (X)",
+      "group": "Case"
+    },
+    {
+      "name": "width",
+      "value": 44.0,
+      "unit": "mm",
+      "min": 30,
+      "max": 250,
+      "label": "Outer width (Y)",
+      "group": "Case"
+    },
+    {
+      "name": "height",
+      "value": 26.0,
+      "unit": "mm",
+      "min": 12,
+      "max": 200,
+      "label": "Case height without lid (Z)",
+      "group": "Case"
+    },
+    {
+      "name": "wall",
+      "value": 2.2,
+      "unit": "mm",
+      "min": 1.2,
+      "max": 5,
+      "step": 0.1,
+      "label": "Wall thickness",
+      "group": "Case"
+    },
+    {
+      "name": "floor",
+      "value": 2.0,
+      "unit": "mm",
+      "min": 1.2,
+      "max": 5,
+      "step": 0.1,
+      "label": "Floor thickness",
+      "group": "Case"
+    },
+    {
+      "name": "corner_radius",
+      "value": 4.0,
+      "unit": "mm",
+      "min": 0.5,
+      "max": 15,
+      "label": "Corner radius",
+      "group": "Case"
+    },
+    {
+      "name": "lid_thickness",
+      "value": 2.0,
+      "unit": "mm",
+      "min": 1.2,
+      "max": 5,
+      "step": 0.1,
+      "label": "Lid thickness",
+      "group": "Lid"
+    },
+    {
+      "name": "lip_height",
+      "value": 2.5,
+      "unit": "mm",
+      "min": 1,
+      "max": 8,
+      "step": 0.1,
+      "label": "Lid lip height",
+      "group": "Lid"
+    },
+    {
+      "name": "lip_wall",
+      "value": 1.2,
+      "unit": "mm",
+      "min": 0.8,
+      "max": 3,
+      "step": 0.1,
+      "label": "Lid lip wall",
+      "group": "Lid"
+    },
+    {
+      "name": "fit_clearance",
+      "value": 0.2,
+      "unit": "mm",
+      "min": 0.05,
+      "max": 0.8,
+      "step": 0.05,
+      "label": "Fit clearance",
+      "group": "Lid"
+    },
+    {
+      "name": "boss_diameter",
+      "value": 6.0,
+      "unit": "mm",
+      "min": 4.5,
+      "max": 10,
+      "step": 0.1,
+      "label": "Boss diameter",
+      "group": "Heat-set inserts (M2.5)"
+    },
+    {
+      "name": "insert_pilot_diameter",
+      "value": 3.6,
+      "unit": "mm",
+      "min": 2.5,
+      "max": 5,
+      "step": 0.05,
+      "label": "Insert pilot hole diameter",
+      "group": "Heat-set inserts (M2.5)"
+    },
+    {
+      "name": "insert_depth",
+      "value": 4.5,
+      "unit": "mm",
+      "min": 2,
+      "max": 10,
+      "step": 0.1,
+      "label": "Insert pilot hole depth",
+      "group": "Heat-set inserts (M2.5)"
+    },
+    {
+      "name": "screw_clearance",
+      "value": 2.8,
+      "unit": "mm",
+      "min": 2.5,
+      "max": 3.5,
+      "step": 0.05,
+      "label": "Screw clearance hole in lid",
+      "group": "Heat-set inserts (M2.5)"
+    },
+    {
+      "name": "usbc_width",
+      "value": 9.4,
+      "unit": "mm",
+      "min": 8.5,
+      "max": 14,
+      "step": 0.1,
+      "label": "USB-C cutout width",
+      "group": "USB-C"
+    },
+    {
+      "name": "usbc_height",
+      "value": 3.6,
+      "unit": "mm",
+      "min": 2.8,
+      "max": 7,
+      "step": 0.1,
+      "label": "USB-C cutout height",
+      "group": "USB-C"
+    },
+    {
+      "name": "usbc_center_z",
+      "value": 5.5,
+      "unit": "mm",
+      "min": 2,
+      "max": 50,
+      "step": 0.1,
+      "label": "USB-C centre above floor",
+      "group": "USB-C"
+    },
+    {
+      "name": "light_pipe_diameter",
+      "value": 3.0,
+      "unit": "mm",
+      "min": 1.5,
+      "max": 8,
+      "step": 0.1,
+      "label": "Light pipe diameter",
+      "group": "Light pipe"
+    },
+    {
+      "name": "light_pipe_x",
+      "value": 22.0,
+      "unit": "mm",
+      "label": "Light pipe position X",
+      "group": "Light pipe"
+    },
+    {
+      "name": "light_pipe_y",
+      "value": 10.0,
+      "unit": "mm",
+      "label": "Light pipe position Y",
+      "group": "Light pipe"
+    },
+    {
+      "name": "light_pipe_flange_diameter",
+      "value": 5.0,
+      "unit": "mm",
+      "min": 2.5,
+      "max": 12,
+      "step": 0.1,
+      "label": "Light pipe flange diameter",
+      "group": "Light pipe"
+    },
+    {
+      "name": "light_pipe_flange_thickness",
+      "value": 1.0,
+      "unit": "mm",
+      "min": 0.6,
+      "max": 3,
+      "step": 0.1,
+      "label": "Light pipe flange thickness",
+      "group": "Light pipe"
+    },
+    {
+      "name": "light_pipe_protrusion",
+      "value": 1.0,
+      "unit": "mm",
+      "min": 0,
+      "max": 5,
+      "step": 0.1,
+      "label": "Light pipe height above lid",
+      "group": "Light pipe"
+    }
+  ],
+  "params_error": null,
+  "files": [
+    "AGENTS.md",
+    "CLAUDE.md",
+    "model.py",
+    "params.toml",
+    "project.toml"
+  ]
+}
