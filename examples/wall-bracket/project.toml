@@ -1,0 +1,6 @@
+name = "wall-bracket"
+profile = "generic-220"
+units = "mm"
+
+[materials]
+default = "PLA"
