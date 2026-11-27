@@ -6,7 +6,8 @@ from pathlib import Path
 
 from .body import DEFAULT_COLOR, Body
 
-# Tessellation presets. GLB uses OCCT's relative deflection; STL/3MF use absolute mm tolerance.
+# Tessellation presets. The viewer GLB (topology.py) uses OCCT's relative deflection; STL/3MF use
+# absolute mm tolerance.
 QUALITY = {
     "coarse": {"glb_linear": 0.005, "glb_angular": 0.4, "mesh_tol_mm": 0.05, "mesh_ang": 0.3},
     "fine": {"glb_linear": 0.001, "glb_angular": 0.15, "mesh_tol_mm": 0.01, "mesh_ang": 0.1},
@@ -26,15 +27,6 @@ def _tagged(name: str, body: Body):
     shape.label = name
     shape.color = Color(body.color or DEFAULT_COLOR)
     return shape
-
-
-def write_glb(name: str, body: Body, path: Path, quality: str = "coarse") -> None:
-    from build123d import export_gltf
-
-    q = QUALITY[quality]
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if not export_gltf(_tagged(name, body), str(path), binary=True, linear_deflection=q["glb_linear"], angular_deflection=q["glb_angular"]):
-        raise RuntimeError(f"GLB export failed for {name}")
 
 
 def write_step(bodies: dict[str, Body], path: Path) -> None:

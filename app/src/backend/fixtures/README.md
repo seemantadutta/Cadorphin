@@ -4,7 +4,7 @@
 
 ```sh
 cadkit new demo --template enclosure
-cadkit build demo                      # copy demo/.cad/out/*.glb and demo/.cad/manifest.json here
+cadkit build demo                      # copy demo/.cad/out/*.glb, *.topo.json and demo/.cad/manifest.json here
 cadkit info demo --json > info.json    # then set "root" to "/mock/demo"
 ```
 

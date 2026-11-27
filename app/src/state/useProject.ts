@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useBackend } from "../backend/context";
-import type { BuildManifest, CheckReport, EngineInfo, NewProjectOptions, ParamValue, Problem, ProjectInfo } from "../backend/types";
+import type { Backend, BuildManifest, CheckReport, EngineInfo, NewProjectOptions, ParamValue, Problem, ProjectInfo } from "../backend/types";
+import type { Topo } from "../viewer/topo";
 import type { ViewerBody } from "../viewer/Viewer";
 import { settings } from "../settings";
 
@@ -33,6 +34,15 @@ export interface ProjectState {
 }
 
 const DEFAULT_COLOR = "#B8BCC4";
+
+/** A body's topology file, or undefined if it can't be read (the body is then shown but not pickable). */
+async function loadTopo(backend: Backend, path: string): Promise<Topo | undefined> {
+  try {
+    return JSON.parse(new TextDecoder().decode(await backend.loadAsset(path))) as Topo;
+  } catch {
+    return undefined;
+  }
+}
 const MAX_LOG = 400;
 const MAX_RECENT = 8;
 
@@ -106,7 +116,12 @@ export function useProject() {
         let viewerBodies: ViewerBody[] | null = null;
         if (shown.length && manifest.exit_code !== 2 && manifest.exit_code !== 3) {
           viewerBodies = await Promise.all(
-            shown.map(async (b) => ({ name: b.name, color: b.color ?? DEFAULT_COLOR, glb: await backend.loadAsset(b.glb!) })),
+            shown.map(async (b) => ({
+              name: b.name,
+              color: b.color ?? DEFAULT_COLOR,
+              glb: await backend.loadAsset(b.glb!),
+              topo: b.topo ? await loadTopo(backend, b.topo) : undefined,
+            })),
           );
         }
         if (gen !== generation.current) {
@@ -124,6 +139,7 @@ export function useProject() {
           viewerBodies: viewerBodies ?? s.viewerBodies,
           lastBuiltAt: failed ? s.lastBuiltAt : new Date(),
           problems: manifest.problems,
+          lastCheck: failed ? s.lastCheck : null, // a new model makes the last full check (and its renders) stale
         }));
       } while (pending.current);
     } catch (e) {
@@ -202,21 +218,32 @@ export function useProject() {
     [backend, log, openProject],
   );
 
-  const runCheck = useCallback(async () => {
-    if (!projectRef.current) return;
-    patch({ checking: true });
-    try {
-      const report = await backend.check("fast");
-      if (report.log) log("output", report.log);
-      report.errors.forEach((e) => log("error", e));
-      const n = report.problems.length;
-      log("info", n ? `Check found ${n} problem${n === 1 ? "" : "s"}` : "Check passed: no problems found");
-      patch({ lastCheck: report, problems: report.problems, checking: false });
-    } catch (e) {
-      log("error", String(e));
-      patch({ checking: false });
-    }
-  }, [backend, log, patch]);
+  /** Run the checks (full by default: walls, small features, renders). Resolves to the report, or null on failure. */
+  const runCheck = useCallback(
+    async (level: "fast" | "full" = "full"): Promise<CheckReport | null> => {
+      if (!projectRef.current) return null;
+      const gen = generation.current;
+      patch({ checking: true });
+      try {
+        const report = await backend.check(level);
+        if (gen !== generation.current) return null; // the project changed meanwhile
+        if (report.log) log("output", report.log);
+        report.errors.forEach((e) => log("error", e));
+        report.notes?.forEach((note) => log("info", note));
+        const errors = report.problems.filter((p) => p.severity === "error").length;
+        const warnings = report.problems.length - errors;
+        const parts = [errors && `${errors} error${errors === 1 ? "" : "s"}`, warnings && `${warnings} warning${warnings === 1 ? "" : "s"}`].filter(Boolean);
+        log("info", parts.length ? `Check found ${parts.join(" and ")}` : "Check passed: no problems found");
+        patch({ lastCheck: report, problems: report.problems, checking: false });
+        return report;
+      } catch (e) {
+        log("error", String(e));
+        patch({ checking: false });
+        return null;
+      }
+    },
+    [backend, log, patch],
+  );
 
   /** Write one parameter to params.toml. The file watcher then rebuilds, as for any other edit. */
   const setParam = useCallback(

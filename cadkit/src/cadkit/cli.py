@@ -63,6 +63,8 @@ def print_result(res: dict[str, Any], out: Out) -> None:
         out.p(f"Manifest: {res['manifest']}")
     for f in res.get("files", []):
         out.p(f"Wrote {f}")
+    if res.get("renders"):
+        out.p("Renders: " + " ".join(res["renders"]))
     for n in res.get("notes", []):
         out.p(f"Note: {n}")
     if res["op"] != "build" and not res["errors"]:

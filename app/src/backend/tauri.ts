@@ -132,8 +132,12 @@ export class TauriBackend implements Backend {
     return invoke<CheckReport>("check", { level });
   }
 
-  export(format: "step" | "stl" | "3mf", outDir?: string) {
-    return invoke<ExportResult>("export", { format, outDir: outDir ?? null });
+  export(format: "step" | "stl" | "3mf", outDir?: string, force?: boolean) {
+    return invoke<ExportResult>("export", { format, outDir: outDir ?? null, force: force ?? false });
+  }
+
+  async revealFolder(path: string) {
+    await invoke("reveal_folder", { path });
   }
 
   readFile(path: string) {
@@ -142,6 +146,10 @@ export class TauriBackend implements Backend {
 
   loadAsset(path: string) {
     return invoke<ArrayBuffer>("load_asset", { path });
+  }
+
+  async writeSelection(json: string | null, png?: Uint8Array) {
+    await invoke("write_selection", { json, png: png ? Array.from(png) : null });
   }
 
   writeParams(values: Record<string, ParamValue>) {

@@ -11,6 +11,7 @@ interface Props {
   errorCount: number;
   checking: boolean;
   onCheck: () => void;
+  onExport: () => void;
   onOpen: () => void;
 }
 
@@ -30,7 +31,7 @@ export function Logo({ size = 22 }: { size?: number }) {
   );
 }
 
-export function TopBar({ projectName, status, lastBuiltAt, bodyCount, errorCount, checking, onCheck, onOpen }: Props) {
+export function TopBar({ projectName, status, lastBuiltAt, bodyCount, errorCount, checking, onCheck, onExport, onOpen }: Props) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -66,10 +67,10 @@ export function TopBar({ projectName, status, lastBuiltAt, bodyCount, errorCount
           {pill.text}
         </div>
       )}
-      <button className="btn" onClick={onCheck} disabled={!projectName || checking} title="Run checks (Ctrl+Shift+C)">
+      <button className="btn" onClick={onCheck} disabled={!projectName || checking} title="Full check: walls, small features, renders (Ctrl+Shift+C)">
         {checking ? "Checking…" : "Check"}
       </button>
-      <button className="btn primary" disabled title="The export dialog arrives in M4. Until then, run: cadkit export --format 3mf">
+      <button className="btn primary" onClick={onExport} disabled={!projectName || !bodyCount} title="Export STEP, STL or 3MF (Ctrl+Shift+E)">
         Export…
       </button>
     </header>

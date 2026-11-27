@@ -301,19 +301,47 @@ async fn build(app: AppHandle) -> Result<Value, String> {
 async fn check(app: AppHandle, level: String) -> Result<Value, String> {
     blocking(move || {
         let root = project_root(&app)?;
-        engine_request(&app, json!({"op": "check", "project": root, "level": level}), BUILD_TIMEOUT)
+        // The full check measures walls and draws renders: give it as long as an export.
+        let timeout = if level == "full" { EXPORT_TIMEOUT } else { BUILD_TIMEOUT };
+        engine_request(&app, json!({"op": "check", "project": root, "level": level}), timeout)
     })
     .await
 }
 
+/// `force` exports even when the checks find errors (the export dialog's "Export anyway").
 #[tauri::command]
-async fn export(app: AppHandle, format: String, out_dir: Option<String>) -> Result<Value, String> {
+async fn export(app: AppHandle, format: String, out_dir: Option<String>, force: Option<bool>) -> Result<Value, String> {
     blocking(move || {
         let root = project_root(&app)?;
-        let req = json!({"op": "export", "project": root, "format": format, "out": out_dir, "cwd": root});
+        let req = json!({"op": "export", "project": root, "format": format, "out": out_dir, "cwd": root,
+                         "force": force.unwrap_or(false)});
         engine_request(&app, req, EXPORT_TIMEOUT)
     })
     .await
+}
+
+/// Shows a folder in the system file manager (the export notice's "Open folder"). Relative paths
+/// are inside the project. Only existing folders are opened; nothing is run from them.
+#[tauri::command]
+fn reveal_folder(app: AppHandle, path: String) -> Result<(), String> {
+    let p = Path::new(&path);
+    let dir = if p.is_absolute() { p.to_path_buf() } else { project_root(&app)?.join(p) };
+    let dir = clean_path(&dir)?;
+    if !dir.is_dir() {
+        return Err(format!("{} is not a folder", dir.display()));
+    }
+    let program = if cfg!(windows) {
+        "explorer"
+    } else if cfg!(target_os = "macos") {
+        "open"
+    } else {
+        "xdg-open"
+    };
+    std::process::Command::new(program)
+        .arg(&dir)
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| format!("Could not open {}: {e}", dir.display()))
 }
 
 /// Change parameter values in params.toml through cadkit (format-preserving). The file
@@ -367,10 +395,21 @@ fn build_menu(app: &tauri::App) -> tauri::Result<()> {
     let new = MenuItemBuilder::with_id("new", "&New Project…").build(app)?;
     let open = MenuItemBuilder::with_id("open", "&Open Project…").build(app)?;
     let close = MenuItemBuilder::with_id("close", "&Close Project").enabled(false).build(app)?;
+    // Shortcuts for these live in the UI (Ctrl+Shift+E, Ctrl+Shift+C), not here: a menu accelerator
+    // would take the key from a focused terminal.
+    let export = MenuItemBuilder::with_id("export", "&Export…").build(app)?;
     let quit = MenuItemBuilder::with_id("quit", "E&xit").build(app)?;
     let prefs = MenuItemBuilder::with_id("preferences", "&Preferences…").accelerator("CmdOrCtrl+,").build(app)?;
     let about = MenuItemBuilder::with_id("about", "&About Cadorphin").build(app)?;
-    let file = SubmenuBuilder::new(app, "&File").item(&new).item(&open).item(&close).separator().item(&quit).build()?;
+    let file = SubmenuBuilder::new(app, "&File")
+        .item(&new)
+        .item(&open)
+        .item(&close)
+        .separator()
+        .item(&export)
+        .separator()
+        .item(&quit)
+        .build()?;
     let edit = SubmenuBuilder::new(app, "&Edit");
     // macOS needs the standard edit items for copy/paste to work in text fields. Elsewhere they would
     // grab Ctrl+C/Ctrl+V from the terminal, so they are left out.
@@ -388,6 +427,42 @@ fn build_menu(app: &tauri::App) -> tauri::Result<()> {
         }
     });
     Ok(())
+}
+
+/// Write a file atomically: to `<name>.tmp`, then renamed, so a reader never sees half of it.
+fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
+    let tmp = path.with_extension("tmp");
+    std::fs::write(&tmp, bytes).map_err(|e| format!("{}: {e}", tmp.display()))?;
+    std::fs::rename(&tmp, path).map_err(|e| format!("{}: {e}", path.display()))
+}
+
+/// Point-and-fix: what the user picked in the viewer, for the agent to read. Writes
+/// `.cad/selection.json` and `.cad/selection.png` (a screenshot with the selection highlighted).
+/// With no `json`, the selection was cleared and both files are deleted, so an agent never acts on
+/// a stale one. `.cad/` is ignored by the file watcher, so this never triggers a rebuild.
+#[tauri::command]
+fn write_selection(app: AppHandle, json: Option<String>, png: Option<Vec<u8>>) -> Result<(), String> {
+    let dir = project_root(&app)?.join(".cad");
+    let json_path = dir.join("selection.json");
+    let png_path = dir.join("selection.png");
+    let Some(json) = json else {
+        for p in [&json_path, &png_path] {
+            match std::fs::remove_file(p) {
+                Ok(()) => {}
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                Err(e) => return Err(format!("{}: {e}", p.display())),
+            }
+        }
+        return Ok(());
+    };
+    std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    match png {
+        Some(bytes) => write_atomic(&png_path, &bytes)?,
+        None => {
+            let _ = std::fs::remove_file(&png_path);
+        }
+    }
+    write_atomic(&json_path, json.as_bytes())
 }
 
 /// Opens the user's shell in the project folder. `command`, if given, is typed into it
@@ -476,6 +551,8 @@ pub fn run() {
             read_file,
             load_asset,
             write_params,
+            write_selection,
+            reveal_folder,
             list_profiles,
             set_profile,
             open_terminal,

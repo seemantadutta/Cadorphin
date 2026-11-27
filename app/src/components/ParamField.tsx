@@ -19,6 +19,21 @@ function stepFor(spec: ParamSpec) {
   return d === 0 ? 1 : Math.pow(10, -Math.min(d, 2));
 }
 
+/** A round step (1, 2 or 5 times a power of ten) of about `x`. */
+function niceStep(x: number) {
+  if (!(x > 0)) return 1;
+  const p = Math.pow(10, Math.floor(Math.log10(x)));
+  const m = x / p;
+  return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p;
+}
+
+/** Slider step: the parameter's `step`, else whole numbers for wide integer ranges, else ~1/200 of the range. */
+function sliderStepFor(spec: ParamSpec, min: number, max: number) {
+  if (spec.step) return spec.step;
+  if (Number.isInteger(spec.value) && Number.isInteger(min) && Number.isInteger(max) && max - min >= 20) return 1;
+  return niceStep((max - min) / 200);
+}
+
 function rangeMessage(spec: ParamSpec, v: number): string | null {
   if (spec.min !== undefined && v < spec.min) return `Below the minimum (${spec.min}${spec.unit ? " " + spec.unit : ""})`;
   if (spec.max !== undefined && v > spec.max) return `Above the maximum (${spec.max}${spec.unit ? " " + spec.unit : ""})`;
@@ -30,11 +45,12 @@ export function ParamField({ spec, onCommit }: Props) {
   const label = spec.label ?? spec.name;
   const [text, setText] = useState(String(spec.value));
   const [focused, setFocused] = useState(false);
+  const [sliding, setSliding] = useState(false);
 
-  // Follow outside changes (the agent or an editor changed params.toml) unless the user is typing.
+  // Follow outside changes (the agent or an editor changed params.toml) unless the user is editing.
   useEffect(() => {
-    if (!focused) setText(String(spec.value));
-  }, [spec.value, focused]);
+    if (!focused && !sliding) setText(String(spec.value));
+  }, [spec.value, focused, sliding]);
 
   if (typeof spec.value === "boolean") {
     return (
@@ -77,7 +93,20 @@ export function ParamField({ spec, onCommit }: Props) {
 
   const title = [spec.name, warning, numeric ? "Enter to apply · ↑/↓ to step (Shift ×10)" : "Enter to apply"].filter(Boolean).join(" · ");
 
-  return (
+  // A slider needs both ends of the range.
+  const hasRange = numeric && spec.min !== undefined && spec.max !== undefined && spec.max > spec.min;
+  const min = spec.min ?? 0;
+  const max = spec.max ?? 0;
+  const sliderStep = hasRange ? sliderStepFor(spec, min, max) : 1;
+  const sliderValue = hasRange ? Math.min(max, Math.max(min, invalid ? Number(spec.value) : num)) : 0;
+  // Drag shows the value as you go; it is written (and the model rebuilt) when you let go.
+  const release = () => {
+    if (!sliding) return;
+    setSliding(false);
+    commit(text);
+  };
+
+  const field = (
     <label className="param" title={title}>
       <span>{label}</span>
       <span className={`param-input${invalid ? " invalid" : warning ? " warn" : ""}`}>
@@ -108,5 +137,30 @@ export function ParamField({ spec, onCommit }: Props) {
         {spec.unit && <span className="unit muted">{spec.unit}</span>}
       </span>
     </label>
+  );
+
+  if (!hasRange) return field;
+  return (
+    <div className="param-block">
+      {field}
+      <input
+        type="range"
+        className="param-slider"
+        min={min}
+        max={max}
+        step={sliderStep}
+        value={sliderValue}
+        aria-label={label}
+        title={`${min} to ${max}${spec.unit ? " " + spec.unit : ""} · release to apply`}
+        onChange={(e) => {
+          setSliding(true);
+          const v = Number(e.target.value);
+          setText(String(Number(v.toFixed(Math.min(Math.max(decimals(sliderStep), 0), 6)))));
+        }}
+        onPointerUp={release}
+        onKeyUp={release}
+        onBlur={release}
+      />
+    </div>
   );
 }
