@@ -25,3 +25,6 @@ target/
 Thumbs.db
 .vscode/
 .idea/
+
+# Bundled Python for release builds (scripts/bundle_python.py)
+app/src-tauri/python/

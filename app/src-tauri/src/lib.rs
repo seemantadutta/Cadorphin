@@ -408,6 +408,7 @@ fn build_menu(app: &tauri::App) -> tauri::Result<()> {
     let quit = MenuItemBuilder::with_id("quit", "E&xit").build(app)?;
     let prefs = MenuItemBuilder::with_id("preferences", "&Preferences…").accelerator("CmdOrCtrl+,").build(app)?;
     let about = MenuItemBuilder::with_id("about", "&About Cadorphin").build(app)?;
+    let updates = MenuItemBuilder::with_id("check_updates", "Check for &Updates…").build(app)?;
     let file = SubmenuBuilder::new(app, "&File")
         .item(&new)
         .item(&open)
@@ -423,7 +424,7 @@ fn build_menu(app: &tauri::App) -> tauri::Result<()> {
     #[cfg(target_os = "macos")]
     let edit = edit.undo().redo().separator().cut().copy().paste().select_all().separator();
     let edit = edit.item(&prefs).build()?;
-    let help = SubmenuBuilder::new(app, "&Help").item(&about).build()?;
+    let help = SubmenuBuilder::new(app, "&Help").item(&updates).separator().item(&about).build()?;
     let menu = MenuBuilder::new(app).items(&[&file, &edit, &help]).build()?;
     app.set_menu(menu)?;
     app.manage(MenuState { close_project: close });
@@ -480,9 +481,7 @@ fn open_terminal(app: AppHandle, cwd: Option<String>, command: Option<String>, c
         Some(c) if !c.is_empty() => PathBuf::from(c),
         _ => project_root(&app)?,
     };
-    // The folder holding the engine's python (a venv's Scripts/ or bin/) also holds `cadkit`.
-    let python = app.state::<AppState>().python.program.clone();
-    let tools = python.is_absolute().then(|| python.parent().map(Path::to_path_buf)).flatten();
+    let tools = app.state::<AppState>().python.tools.clone();
     app.state::<Terminals>().open(&app, &dir, command, tools.as_deref(), cols, rows)
 }
 
@@ -537,12 +536,8 @@ pub fn run() {
     reaper::kill_children_with_app(); // before anything starts a child process
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .manage(AppState {
-            python: PythonCmd::discover(),
-            engine: Mutex::new(None),
-            project: Mutex::new(None),
-            watcher: Mutex::new(None),
-        })
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
             engine_info,
             initial_project,
@@ -569,6 +564,14 @@ pub fn run() {
         ])
         .manage(Terminals::default())
         .setup(|app| {
+            // Here rather than in .manage(): release builds find their bundled Python in the resources folder
+            let resources = app.path().resource_dir().ok();
+            app.manage(AppState {
+                python: PythonCmd::discover(resources.as_deref()),
+                engine: Mutex::new(None),
+                project: Mutex::new(None),
+                watcher: Mutex::new(None),
+            });
             build_menu(app)?;
             Ok(())
         })

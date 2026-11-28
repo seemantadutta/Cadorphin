@@ -49,7 +49,9 @@ Editing a value calls `writeParams()`, which runs `cadkit set` in the engine. Th
 
 ## Menus and Preferences
 
-The native menu bar has **File** (New Project…, Open Project…, Close Project, Exit), **Edit** (Preferences…, Ctrl+,) and **Help** (About). Rust only emits a `menu` event with the item's id; the UI decides what to do. Menu shortcuts are taken before the focused terminal sees the key, so none may collide with keys terminal programs use (Ctrl+C, Ctrl+O, Ctrl+Q and so on). For the same reason the standard Cut/Copy/Paste items exist only on macOS.
+The native menu bar has **File** (New Project…, Open Project…, Close Project, Exit), **Edit** (Preferences…, Ctrl+,) and **Help** (Check for Updates…, About). Rust only emits a `menu` event with the item's id; the UI decides what to do. Menu shortcuts are taken before the focused terminal sees the key, so none may collide with keys terminal programs use (Ctrl+C, Ctrl+O, Ctrl+Q and so on). For the same reason the standard Cut/Copy/Paste items exist only on macOS.
+
+**Updates.** Release builds check `latest.json` on the latest GitHub release a few seconds after launch, and again from Help → Check for Updates…. A startup check stays quiet unless it finds an update; a manual one also says "latest version" or why it failed. **Install and restart** downloads the signed update, installs it and relaunches (on Windows the installer closes the app itself). Dev builds never update.
 
 Preferences has three sections: **Printer**, **Appearance** (theme) and **Viewer** (mouse controls). Theme and controls are per-user UI settings in local storage. The printer is a project setting: it is `profile` in `project.toml`, written by `cadkit set-profile`, because `cadkit check` and agents in the terminal must test against the same build volume. The status bar shows it and opens Preferences when clicked.
 
@@ -98,7 +100,7 @@ On the enclosure template, a rebuild takes about 0.8 s, about 1.1 s from saving 
 
 **The desktop app keeps one worker alive (decided in M2).** Importing build123d takes about 3 s, longer than the 2 s rebuild target on its own. So the app starts one `python -m cadkit serve` process, which imports build123d once and then answers JSON-lines requests. Each request runs the same `execute()` code as the CLI worker, with the project's modules reloaded, so the results are identical. Rust enforces the timeout (30 s for builds, 120 s for exports) by killing the worker. The next request starts a fresh one. Stray C-level output is sent to stderr, so stdout carries only protocol lines.
 
-**Finding Python (v1 requires the user to install it).** In order: `CADORPHIN_PYTHON`, then the repo's `.venv` (debug builds only), then `python` (Windows) or `python3` on `PATH`. If the engine can't start, the welcome screen shows what was tried and how to fix it.
+**Finding Python.** Release builds ship their own (see [releasing.md](releasing.md)). In order: `CADORPHIN_PYTHON`, then the repo's `.venv` (debug builds only), then the bundled Python in the app's resources, then `python` (Windows) or `python3` on `PATH`. The bundled one runs with `-E -s`, and its `shims/` folder (a relocatable `cadkit`) goes first on the terminals' `PATH`. If the engine can't start, the welcome screen shows what was tried and how to fix it.
 
 **Coordinates.** cadkit's GLBs are in metres with a Y-up root rotation, as glTF requires. The viewer undoes both, so the whole scene is Z-up millimetres, matching the model, the manifest and the problem locations.
 

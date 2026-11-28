@@ -3,7 +3,7 @@
 from .body import Body
 from .params import Params, load_params
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"
 APP_NAME = "Cadorphin"
 
 __all__ = ["Body", "Params", "load_params", "__version__", "APP_NAME"]

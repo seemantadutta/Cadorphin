@@ -1774,6 +1774,19 @@ button.doc-tab {
   flex: none;
 }
 
+/* The update notice sits above the export notice, so both can show at once */
+.toast.update {
+  bottom: auto;
+  top: 56px;
+}
+
+.toast .update-error {
+  max-width: 360px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .toast .close {
   width: 24px;
   height: 24px;

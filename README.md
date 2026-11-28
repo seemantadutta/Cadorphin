@@ -6,6 +6,10 @@ Cadorphin is an open-source desktop app for makers and electronics hobbyists. Yo
 
 > **Status:** early development. The CAD engine (`cadkit`), the desktop app's live 3D viewer, agent terminals and point-and-fix work today. Full checks and the export dialog are being finished. See the [roadmap](#roadmap).
 
+## Download
+
+Get the installer for Windows (x64) or macOS (Apple Silicon) from the [latest release](https://github.com/seemantadutta/Cadorphin/releases/latest). It includes its own Python and CAD engine, so there is nothing else to install apart from your coding agent. The release notes explain the one-time security prompt, since the installers aren't code-signed yet. Cadorphin updates itself: it checks at startup, and from **Help → Check for Updates…**.
+
 ## Principles
 
 - **Agent-agnostic.** No private API. The agent edits files and runs `cadkit` commands, like a person would.

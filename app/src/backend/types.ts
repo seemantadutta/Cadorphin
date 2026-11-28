@@ -29,7 +29,13 @@ export interface PrinterProfile {
 }
 
 /** Ids the native menu sends (app/src-tauri/src/lib.rs, build_menu). */
-export type MenuId = "new" | "open" | "close" | "export" | "preferences" | "about";
+export type MenuId = "new" | "open" | "close" | "export" | "preferences" | "about" | "check_updates";
+
+/** A newer Cadorphin release, from the updater. */
+export interface AppUpdate {
+  version: string;
+  notes?: string;
+}
 
 /** A project template for `cadkit new` (templates/). */
 export interface ProjectTemplate {
@@ -184,6 +190,13 @@ export interface Backend {
   onMenu(cb: (id: MenuId) => void): Unsubscribe;
   /** Cadorphin's own version. */
   appVersion(): Promise<string>;
+  /** Looks for a newer release. Null when up to date, and always in builds that can't update themselves (dev, preview). */
+  checkForUpdate(): Promise<AppUpdate | null>;
+  /**
+   * Downloads and installs the update the last checkForUpdate found, then restarts Cadorphin.
+   * `onProgress` gets the fraction downloaded, or null when the size is unknown.
+   */
+  installUpdate(onProgress?: (fraction: number | null) => void): Promise<void>;
   /**
    * Opens the user's shell in a PTY (default cwd: the project folder). `command`, if given, is typed
    * into the shell after it starts; the shell stays open when the command exits.

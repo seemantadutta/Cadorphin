@@ -2,8 +2,11 @@ import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
+import { relaunch } from "@tauri-apps/plugin-process";
+import { check, type Update } from "@tauri-apps/plugin-updater";
 
 import type {
+  AppUpdate,
   Backend,
   BuildManifest,
   CheckReport,
@@ -114,6 +117,31 @@ export class TauriBackend implements Backend {
 
   appVersion() {
     return getVersion();
+  }
+
+  private update: Update | null = null;
+
+  async checkForUpdate(): Promise<AppUpdate | null> {
+    if (import.meta.env.DEV) return null; // a dev build must not replace itself with a release
+    this.update = await check();
+    return this.update ? { version: this.update.version, notes: this.update.body || undefined } : null;
+  }
+
+  async installUpdate(onProgress?: (fraction: number | null) => void) {
+    const update = this.update;
+    if (!update) throw new Error("No update to install. Check for updates first.");
+    let total = 0;
+    let done = 0;
+    await update.downloadAndInstall((e) => {
+      if (e.event === "Started") {
+        total = e.data.contentLength ?? 0;
+        onProgress?.(total ? 0 : null);
+      } else if (e.event === "Progress") {
+        done += e.data.chunkLength;
+        onProgress?.(total ? Math.min(done / total, 1) : null);
+      }
+    });
+    await relaunch(); // Windows never gets here: the installer closes the app itself
   }
 
   listProfiles() {
