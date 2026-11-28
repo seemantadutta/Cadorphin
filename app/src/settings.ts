@@ -1,6 +1,7 @@
 import type { ControlsMode, Projection } from "./viewer/Viewer";
 
 export type ThemeChoice = "system" | "light" | "dark";
+export type ExportFormat = "3mf" | "stl" | "step";
 
 /** The agent a project uses (see terminal/agents.ts), and the session to resume when it reopens. */
 export interface ProjectAgent {
@@ -18,6 +19,11 @@ interface Settings {
   projectsDir: string | null;
   /** The printer the New Project dialog suggests. */
   lastPrinter: string;
+  /** Sidebar tree: which sections, parameter groups and bodies are open (missing = default). */
+  sidebarFolds: Record<string, boolean>;
+  /** The export dialog's last format, and its output folder per project (missing = .cad/export). */
+  exportFormat: ExportFormat;
+  exportDirs: Record<string, string>;
   /** Ask before leaving a project closes terminals the user has worked in. */
   confirmCloseTerminals: boolean;
   /** The agent id the New Project dialog suggests ("" = a plain terminal). */
@@ -41,6 +47,9 @@ const DEFAULTS: Settings = {
   lastPrinter: "generic-256",
   newProjectAgent: "",
   confirmCloseTerminals: true,
+  exportFormat: "3mf",
+  exportDirs: {},
+  sidebarFolds: {},
   projectAgents: {},
   controls: "orbit",
   projection: "perspective",

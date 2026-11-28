@@ -26,7 +26,7 @@ Creates a project from a template. The folder must be new or empty. It generates
 
 ## `cadkit build [path] [--quality coarse|fine]`
 
-Runs `model.py` and writes one GLB per valid body to `.cad/out/<body>.glb`, plus `.cad/manifest.json`. GLBs from bodies that no longer exist are deleted. The manifest is written even when the script fails, so the app can show the error.
+Runs `model.py` and writes one GLB per valid body to `.cad/out/<body>.glb`, plus `.cad/manifest.json`. Each GLB carries a `_FACE_ID` vertex attribute, and `.cad/out/<body>.topo.json` describes its faces, edges and holes, for the app's point-and-fix (see [architecture.md](architecture.md#point-and-fix)). GLBs from bodies that no longer exist are deleted. The manifest is written even when the script fails, so the app can show the error.
 
 ```json
 {
@@ -35,7 +35,7 @@ Runs `model.py` and writes one GLB per valid body to `.cad/out/<body>.glb`, plus
   "bodies": [
     {"name": "case", "material": "PETG", "color": "#3A3F4A",
      "bbox": [72.0, 44.0, 26.0], "bbox_min": [-36.0, -22.0, 0.0],
-     "volume_mm3": 21733.2, "valid": true, "glb": ".cad/out/case.glb"}
+     "volume_mm3": 21733.2, "valid": true, "glb": ".cad/out/case.glb", "topo": ".cad/out/case.topo.json"}
   ],
   "problems": [],
   "errors": [],
@@ -54,7 +54,23 @@ Runs `model.py` and writes one GLB per valid body to `.cad/out/<body>.glb`, plus
 - No two bodies overlap. Touching faces are allowed.
 - Parameter values are inside their `min`/`max`. Values outside produce a warning.
 
-**Full**: the thin-wall and small-feature checks and the PNG renders are not implemented yet (milestone M4). For now `--full` runs the fast checks and adds a note saying so.
+**Full** (`--full`; the app's Check button and its export dialog run this) adds:
+- **Thin walls.** Points are sampled over each body's surface, and a ray from each point straight into the material measures the wall there. Spots below the minimum wall are grouped into connected regions, and each region is reported once, at its thinnest point, with its size.
+  - Below the minimum wall: a warning.
+  - Thinner than the nozzle over 3 mm or more: an error, because that wall will not print.
+  - A smaller region thinner than the nozzle (a sliver where two curves meet, say) is a warning: the slicer simply leaves it out.
+- **Small features.** Holes narrower than two nozzle widths may close up, and pins that thin may not print. Both are warnings.
+- **Renders.** `iso`, `top`, `front` and `right` views of all bodies, plus `section`: a front view cut through the middle, with the cut faces in red. They are written to `.cad/renders/*.png` (800 x 600), replacing the previous ones, and listed in `renders`. They are drawn in software, so they work without a display.
+
+The minimum wall comes from the printer profile (`defaults.min_wall_mm`, else 1.2 mm), and the nozzle is 0.4 mm if the profile lists it, else its smallest. A project can override both in `project.toml`:
+
+```toml
+[checks]
+min_wall_mm = 1.0
+nozzle_mm = 0.6
+```
+
+The JSON output of a full check also has `renders` and `checks` (the limits used).
 
 Text output:
 
@@ -62,7 +78,9 @@ Text output:
 ✓ Script ran in 2.3 s
 ✓ 3 bodies: case, lid, light_pipe
 ✗ a and b overlap by 500.0 mm³ near (2.5, 0.0, 0.0)
-1 problem found
+⚠ Thin wall: case, 0.9 mm over about 20 x 8 mm (min 1.2 mm) near (12.0, -17.0, 4.0)
+Renders: .cad/renders/iso.png .cad/renders/top.png .cad/renders/front.png .cad/renders/right.png .cad/renders/section.png
+1 problem and 1 warning found
 ```
 
 JSON output has `ok`, `exit_code`, `duration_ms`, `script_ms`, `bodies` (as in the manifest, without `glb`), `problems`, `errors`, `notes` and `log` (anything the script printed).
@@ -72,7 +90,7 @@ Each problem has:
 | Field | Meaning |
 |---|---|
 | `severity` | `error` blocks export. `warning` does not. |
-| `code` | `script_error`, `not_solid`, `invalid_solid`, `open_shell`, `too_large`, `overlap`, `param_range` or `no_bodies` (export of a model with no bodies). |
+| `code` | `script_error`, `not_solid`, `invalid_solid`, `open_shell`, `too_large`, `overlap`, `param_range`, `no_bodies` (export of a model with no bodies), and with `--full` also `thin_wall` and `small_feature`. |
 | `message` | Human-readable text. |
 | `body` | Optional. The body the problem is about. |
 | `bodies` | Optional. All bodies involved, e.g. both bodies in an overlap. |

@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "duration_ms": 3106,
+  "duration_ms": 2927,
   "bodies": [
     {
       "name": "case",
@@ -18,7 +18,8 @@
       ],
       "volume_mm3": 20040.03,
       "valid": true,
-      "glb": ".cad/out/case.glb"
+      "glb": ".cad/out/case.glb",
+      "topo": ".cad/out/case.topo.json"
     },
     {
       "name": "lid",
@@ -36,7 +37,8 @@
       ],
       "volume_mm3": 6760.003,
       "valid": true,
-      "glb": ".cad/out/lid.glb"
+      "glb": ".cad/out/lid.glb",
+      "topo": ".cad/out/lid.topo.json"
     },
     {
       "name": "light_pipe",
@@ -54,7 +56,8 @@
       ],
       "volume_mm3": 40.841,
       "valid": true,
-      "glb": ".cad/out/light_pipe.glb"
+      "glb": ".cad/out/light_pipe.glb",
+      "topo": ".cad/out/light_pipe.topo.json"
     }
   ],
   "problems": [],

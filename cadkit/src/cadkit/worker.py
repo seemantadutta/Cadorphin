@@ -108,12 +108,14 @@ def param_warnings() -> list[Problem]:
 
 def op_build(project: Project, bodies: dict[str, Body], req: dict[str, Any], res: dict[str, Any]) -> None:
     from .checks import solid_problems
-    from .exporters import write_glb
+    from .exporters import QUALITY
+    from .topology import write_viewer_files
 
+    q = QUALITY[req.get("quality", "coarse")]
     out = project.cad_dir / "out"
     out.mkdir(parents=True, exist_ok=True)
-    for stale in out.glob("*.glb"):
-        if stale.stem not in bodies:
+    for stale in [*out.glob("*.glb"), *out.glob("*.topo.json")]:
+        if stale.name.split(".")[0] not in bodies:
             stale.unlink()
     infos = []
     for name, body in bodies.items():
@@ -122,8 +124,9 @@ def op_build(project: Project, bodies: dict[str, Body], req: dict[str, Any], res
         info = body_info(name, body, valid=not problems)
         glb = out / f"{name}.glb"
         if not problems:
-            write_glb(name, body, glb, req.get("quality", "coarse"))
+            topo = write_viewer_files(name, body, glb, q["glb_linear"], q["glb_angular"])
             info["glb"] = _rel(project, glb)
+            info["topo"] = _rel(project, topo)
         infos.append(info)
     res["bodies"] = infos
     res["problems"] += [p.to_json() for p in param_warnings()]
@@ -137,7 +140,25 @@ def op_check(project: Project, bodies: dict[str, Body], req: dict[str, Any], res
     if not bodies:
         res["notes"].append("No bodies yet: build(params) returned an empty dict.")
     if req.get("level") == "full":
-        res["notes"].append("Full checks (thin walls, small features, renders) are not implemented yet; ran fast checks only.")
+        from .fullcheck import check_settings, small_features, thin_walls, write_renders
+
+        settings = check_settings(project)
+        res["checks"] = settings
+        full: list[Problem] = []
+        for name, body in bodies.items():
+            if name in bad:
+                continue  # an invalid solid has no meaningful thickness; it is already reported
+            try:
+                full += thin_walls(name, body, settings["min_wall_mm"], settings["nozzle_mm"])
+                full += small_features(name, body, settings["nozzle_mm"])
+            except Exception as e:  # noqa: BLE001 - a failed measurement must not hide the other results
+                res["notes"].append(f"Could not measure walls of {name}: {type(e).__name__}: {e}")
+        res["problems"] += [p.to_json() for p in full]
+        try:
+            res["renders"] = [_rel(project, p) for p in write_renders(bodies, project.cad_dir / "renders")]
+        except Exception as e:  # noqa: BLE001
+            res["renders"] = []
+            res["notes"].append(f"Could not draw the renders: {type(e).__name__}: {e}")
 
 
 def op_export(project: Project, bodies: dict[str, Body], req: dict[str, Any], res: dict[str, Any]) -> None:

@@ -1,5 +1,4 @@
 import {
-  NotYetImplemented,
   type Backend,
   type BuildManifest,
   type CheckReport,
@@ -17,11 +16,12 @@ import {
 import infoFixture from "./fixtures/enclosure/info.json";
 import manifest from "./fixtures/enclosure/manifest.json";
 
-// GLBs produced by `cadkit build` on the enclosure template (see fixtures/README.md).
-const glbUrls = import.meta.glob("./fixtures/enclosure/*.glb", { query: "?url", import: "default", eager: true }) as Record<
-  string,
-  string
->;
+// GLBs and topology files produced by `cadkit build` on the enclosure template (see fixtures/README.md).
+const glbUrls = import.meta.glob(["./fixtures/enclosure/*.glb", "./fixtures/enclosure/*.topo.json"], {
+  query: "?url",
+  import: "default",
+  eager: true,
+}) as Record<string, string>;
 
 const PROFILES: PrinterProfile[] = [
   ...(
@@ -86,7 +86,7 @@ class FakeShell {
 /** Fixture-backed backend for tests and for running the UI in a plain browser (`npm run dev`). */
 export class MockBackend implements Backend {
   private listeners = new Set<(paths: string[]) => void>();
-  private info: ProjectInfo = structuredClone(infoFixture) as ProjectInfo;
+  private info: ProjectInfo = structuredClone(infoFixture) as unknown as ProjectInfo;
   private shells = new Map<TerminalId, FakeShell>();
   private dataSubs = new Map<TerminalId, (d: string) => void>();
   private exitSubs = new Map<TerminalId, (c: number | null) => void>();
@@ -160,8 +160,15 @@ export class MockBackend implements Backend {
     return { ok: true, exit_code: 0, bodies: m.bodies, problems: [], errors: [], notes: [] };
   }
 
-  async export(): Promise<ExportResult> {
-    throw new NotYetImplemented("Export from the app", "M4");
+  async export(format: "step" | "stl" | "3mf"): Promise<ExportResult> {
+    await delay(400);
+    const files =
+      format === "stl" ? ["case", "lid", "light_pipe"].map((b) => `.cad/export/demo-${b}.stl`) : [`.cad/export/demo.${format}`];
+    return { ok: true, exit_code: 0, files, problems: [], errors: [], notes: [] };
+  }
+
+  async revealFolder(path: string) {
+    console.info("[mock] open folder:", path);
   }
 
   async readFile(path: string) {
@@ -173,6 +180,10 @@ export class MockBackend implements Backend {
     const url = glbUrls[`./fixtures/enclosure/${name}`];
     if (!url) throw new Error(`No fixture for ${path}`);
     return (await fetch(url)).arrayBuffer();
+  }
+
+  async writeSelection(json: string | null) {
+    if (json) console.info("[mock] .cad/selection.json:", JSON.parse(json));
   }
 
   async writeParams(values: Record<string, ParamValue>): Promise<SetParamsResult> {

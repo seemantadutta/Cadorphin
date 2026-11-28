@@ -60,6 +60,25 @@ Preferences has three sections: **Printer**, **Appearance** (theme) and **Viewer
 - **Close Project** stops the file watcher and returns to the start screen, which lists recent projects (most recent first, up to 8, kept in local storage). The app reopens the last project at launch, unless it was closed.
 - Terminals belong to a project: leaving it (open, new or close) closes them, because an agent left running in the old folder would keep editing a project that is no longer on screen. If you have typed in a terminal, or started it from an agent shortcut, Cadorphin asks first. A build still running for the old project is discarded when it finishes.
 
+## Checks and export (M4)
+
+- **Check** (top bar, Ctrl+Shift+C) runs `cadkit check --full`: the fast checks plus thin walls, small features and renders. It gets the export's longer timeout. The Problems tab lists the results. Click one to glide the view to its marker, and use **Send to agent** to paste it into the active terminal (the current terminal tab, else the one last used) without pressing Enter. After a full check, the tab links to the renders, which open as image tabs next to the code tabs. A rebuild clears the last full check, so its renders and wall results are never shown for a changed model.
+- **Problem markers** stay a fixed size on screen and show through the model: red for errors, amber for warnings, larger for the selected problem.
+- **Export** (top bar, File → Export…, Ctrl+Shift+E) asks for a format and a folder (`.cad/export` in the project by default; the choice is remembered per project), then runs the full check.
+  - No problems: it exports, and a short notice with **Open folder** fades after a few seconds.
+  - Only warnings: it exports, and the notice stays until dismissed, with **Show problems**.
+  - Errors: the dialog lists them, with **Fix** (opens the Problems tab), **Export anyway** (`force`) and **Cancel**.
+- **The printer profile** is chosen in Preferences (see Menus and Preferences).
+
+## Point-and-fix
+
+Click a face or edge in the viewer, then tell the agent what to change ("make this hole bigger", "chamfer these edges").
+
+- **cadkit tags the mesh.** `topology.py` meshes each B-rep face separately and writes the viewer GLB with a `_FACE_ID` on every vertex. Next to it, `<body>.topo.json` describes every face (type, area, centre, normal, radius and axis, concave or convex) and edge (type, length, ends, the two faces it joins, a polyline for drawing). It also recognises holes, including ones split into half-cylinders, and groups identical holes ("1 of 4"). Seam edges are left out.
+- **The viewer picks.** Hover highlights the face or edge under the cursor; an edge within 7 px wins over the face behind it. Click selects, Shift+click adds or removes, Ctrl+drag boxes, Esc clears. A box takes the visible edges fully inside it, or the visible faces if there are none. Edges are drawn from the topology, not guessed from creases.
+- **The agent is told.** On every change the app writes `.cad/selection.json` (geometry, plain-language descriptions, hole groups) and `.cad/selection.png` (the view with the selection highlighted). The next time a terminal gets focus, a one-line reference is pasted into it, once, as a bracketed paste, so it lands in the agent's prompt without being sent. The agent rules tell agents what that reference means.
+- **Ids are per build.** Face and edge ids index `shape.faces()` and `shape.edges()` and change when the model changes, so a rebuild clears the selection, and the agent only ever sees geometry.
+
 ## The rebuild loop (M2)
 
 1. The Rust watcher sees a change to `*.py`, `*.toml` or `boards/**`, waits for 300 ms of quiet, then emits `files-changed`. It ignores `.cad/`, `__pycache__/` and `.git/`, so builds can't trigger themselves.

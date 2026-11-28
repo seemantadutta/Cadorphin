@@ -4,7 +4,7 @@
 
 Cadorphin is an open-source desktop app for makers and electronics hobbyists. You describe the part to Claude Code, Codex or any other CLI agent in a terminal pane. The agent edits a parametric [build123d](https://github.com/gumyr/build123d) script. The 3D view updates live, checks catch problems before you print, and export gives you STEP, STL or multi-body 3MF for any slicer.
 
-> **Status:** early development. The CAD engine (`cadkit`) and the desktop app's live 3D viewer work today. The built-in agent terminal and the export dialog are next. See the [roadmap](#roadmap).
+> **Status:** early development. The CAD engine (`cadkit`), the desktop app's live 3D viewer, agent terminals and point-and-fix work today. Full checks and the export dialog are being finished. See the [roadmap](#roadmap).
 
 ## Principles
 
@@ -75,7 +75,7 @@ docs/        architecture, CLI reference, profiles, UI mockups
 - [x] **M0** Repo skeleton and CI
 - [x] **M1** `cadkit` core: `new`, `build`, `check --fast`, `export` (STEP, STL, 3MF)
 - [x] **M2** Desktop shell and 3D viewer, live rebuild on file change
-- [ ] **M3** Terminal pane and agent loop, parameters panel
+- [x] **M3** Terminal pane and agent loop, parameters panel
 - [ ] **M4** Full checks (thin walls, renders), Problems tab, export dialog, profile picker
 
 ## Security

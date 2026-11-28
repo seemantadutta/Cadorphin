@@ -1051,9 +1051,75 @@ button.doc-tab {
   color: var(--muted);
 }
 
+/* Problems tab (M4) */
+
+.problems-panel {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+.problems-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.problems-head .renders {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.problems {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  overflow-y: auto;
+}
+
 .problem {
   display: flex;
+  align-items: center;
   gap: 8px;
+  padding: 0 12px 0 4px;
+}
+
+.problem:hover,
+.problem.active {
+  background: var(--active);
+}
+
+.problem-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  gap: 8px;
+  padding: 5px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--fg-2);
+  font: inherit;
+  text-align: left;
+}
+
+.problem-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.problem .send {
+  flex: none;
+  visibility: hidden;
+}
+
+.problem:hover .send,
+.problem.active .send,
+.problem .send:focus-visible {
+  visibility: visible;
 }
 
 .problem.error .sev {
@@ -1427,4 +1493,310 @@ button.doc-tab {
 .dont-ask input,
 .choice input[type="checkbox"] {
   accent-color: var(--accent);
+}
+
+/* ------------------------------------------------------------- point-and-fix */
+
+.select-box {
+  position: absolute;
+  z-index: 4;
+  border: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  pointer-events: none;
+}
+
+.selection-chip {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100% - 140px); /* clear of the axis gizmo */
+  padding: 6px 6px 6px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.25);
+}
+
+.selection-what {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.selection-chip .small {
+  flex: none;
+  white-space: nowrap;
+}
+
+.selection-chip .close {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+}
+
+.selection-chip .close:hover {
+  background: var(--active);
+  color: var(--fg);
+}
+
+/* ------------------------------------------------------------- sidebar tree */
+
+.sidebar.tree {
+  gap: 2px;
+  padding: 8px 8px 14px;
+}
+
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tree-toggle {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 6px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--fg-2);
+  text-align: left;
+}
+
+.tree-toggle:hover {
+  background: var(--active);
+  color: var(--fg);
+}
+
+.level-1 > .tree-row .tree-toggle {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.level-2 > .tree-row .tree-toggle {
+  font-size: 12.5px;
+}
+
+.tree-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-count {
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: 8px;
+  background: var(--active);
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.chevron {
+  flex: none;
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 5px solid currentColor;
+  transition: transform 0.12s ease;
+  opacity: 0.8;
+}
+
+.chevron.open {
+  transform: rotate(90deg);
+}
+
+.tree-children {
+  padding: 2px 0 8px 12px;
+}
+
+.level-2 > .tree-children {
+  padding: 2px 4px 6px 18px;
+}
+
+.tree-empty {
+  margin: 2px 6px 6px;
+}
+
+.body-visible {
+  flex: none;
+  margin: 0 6px 0 0;
+  accent-color: var(--accent);
+}
+
+.body-details {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  margin: 0;
+  color: var(--fg-2);
+}
+
+.body-details dt {
+  color: var(--muted);
+}
+
+.body-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* ------------------------------------------------------------- parameter sliders */
+
+.param-block {
+  margin-bottom: 8px;
+}
+
+.param-block .param {
+  margin-bottom: 2px;
+}
+
+.param-slider {
+  display: block;
+  width: 100%;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* ------------------------------------------------------------- M4: buttons, export, notices, images */
+
+.btn.small-btn {
+  height: 24px;
+  padding: 0 9px;
+  font-size: 12px;
+}
+
+.link {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.link:disabled {
+  color: var(--muted);
+}
+
+.field .link {
+  align-self: flex-start;
+}
+
+.export {
+  max-width: 520px;
+}
+
+.export-errors {
+  max-height: 220px;
+  overflow-y: auto;
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--input);
+}
+
+.export-errors li {
+  padding: 2px 0;
+  overflow-wrap: anywhere;
+}
+
+.toast {
+  position: fixed;
+  right: 16px;
+  bottom: 40px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 10px 10px 10px 14px;
+  border: 1px solid var(--border-strong);
+  border-left: 4px solid var(--ok);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.3);
+}
+
+.toast.warn {
+  border-left-color: var(--warn);
+}
+
+.toast-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.toast-body .mono {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toast-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.toast .close {
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 16px;
+}
+
+.image-view {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  overflow: auto;
+}
+
+.image-view img {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 6px;
+  box-shadow: 0 4px 18px rgb(0 0 0 / 0.25);
 }

@@ -4,6 +4,7 @@ import { useBackend } from "./backend/context";
 import { AboutDialog } from "./components/AboutDialog";
 import { BottomPanel, type BottomTab, type TermTab } from "./components/BottomPanel";
 import { ConfirmDialog } from "./components/ConfirmDialog";
+import { ExportDialog, type ExportOutcome } from "./components/ExportDialog";
 import { NewProjectDialog } from "./components/NewProjectDialog";
 import { PreferencesDialog, type PrefsSection } from "./components/PreferencesDialog";
 import { Sidebar } from "./components/Sidebar";
@@ -14,6 +15,7 @@ import { projectKey, settings, type ProjectAgent, type ThemeChoice } from "./set
 import { agentFor, findAgent, type AgentDef } from "./terminal/agents";
 import { useProject } from "./state/useProject";
 import type { NewProjectOptions } from "./backend/types";
+import { selectionFile, summarize, type Pick, type Topo } from "./viewer/topo";
 import type { ControlsMode } from "./viewer/Viewer";
 import { ViewerPane } from "./viewer/ViewerPane";
 
@@ -45,7 +47,8 @@ export function App() {
   const startAgent = useRef<string | null>(null);
   const [themeChoice, setThemeChoice] = useState<ThemeChoice>(settings.get("theme"));
   const [controls, setControls] = useState<ControlsMode>(settings.get("controls"));
-  const [openFiles, setOpenFiles] = useState<{ path: string; text: string }[]>([]);
+  /** Read-only document tabs: text files, or images (renders) as blob URLs. */
+  const [openFiles, setOpenFiles] = useState<{ path: string; text?: string; image?: string }[]>([]);
   const [activeFile, setActiveFile] = useState<string | null>(null);
   const [dialog, setDialog] = useState<
     | { kind: "prefs"; section: PrefsSection }
@@ -53,9 +56,23 @@ export function App() {
     | { kind: "new" }
     | { kind: "confirm"; title: string; body: string; label: string; action: () => void; offerDontAsk?: boolean }
     | { kind: "message"; title: string; body: string }
+    | { kind: "export" }
     | null
   >(null);
   const closeDialog = useCallback(() => setDialog(null), []);
+  // Point-and-fix: what is picked in the viewer, and whether its reference still has to be pasted
+  // into a terminal (it is pasted once, the next time a terminal gets focus).
+  const [selection, setSelection] = useState<{ picks: Pick[]; summary: string; pasted: boolean } | null>(null);
+  const pendingPaste = useRef<string | null>(null);
+  const pasteFns = useRef(new Map<string, (text: string) => void>());
+  const [clearSelection, setClearSelection] = useState(0);
+  // Problems: the one shown in the view, and the viewer's glide target.
+  const [activeProblem, setActiveProblem] = useState<number | null>(null);
+  const [focus, setFocus] = useState<{ location: [number, number, number]; n: number } | null>(null);
+  const lastTerminal = useRef<string | null>(null);
+  const [toast, setToast] = useState<{ kind: "ok" | "warn"; title: string; files: string[]; folder: string; warnings: number } | null>(
+    null,
+  );
   const theme = useTheme(themeChoice);
 
   const bodies = useMemo(() => state.manifest?.bodies ?? [], [state.manifest]);
@@ -84,10 +101,15 @@ export function App() {
     });
 
   const check = useCallback(async () => {
-    await runCheck();
-    setTab("problems");
+    if (!state.project) return;
+    setTab("problems"); // shows "Checking…" while it runs
     setPanelOpen(true);
-  }, [runCheck]);
+    await runCheck("full");
+  }, [runCheck, state.project]);
+
+  const openExport = useCallback(() => {
+    if (state.project && state.manifest?.bodies.length) setDialog({ kind: "export" });
+  }, [state.project, state.manifest]);
 
   // Leaving a project (open another, new, close) closes its terminals. Ask first if any of them
   // is in use, since an agent may be working in it.
@@ -143,10 +165,11 @@ export function App() {
         if (id === "new") newProject();
         else if (id === "open") void openFolder();
         else if (id === "close") close();
+        else if (id === "export") openExport();
         else if (id === "preferences") setDialog({ kind: "prefs", section: "printer" });
         else if (id === "about") setDialog({ kind: "about" });
       }),
-    [backend, newProject, openFolder, close],
+    [backend, newProject, openFolder, close, openExport],
   );
 
   // Ctrl/Cmd+Shift+C runs checks. Ctrl/Cmd+, opens Preferences (the menu accelerator does too;
@@ -156,6 +179,9 @@ export function App() {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "c") {
         e.preventDefault();
         void check();
+      } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "e") {
+        e.preventDefault();
+        openExport();
       } else if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === ",") {
         e.preventDefault();
         setDialog((d) => d ?? { kind: "prefs", section: "printer" });
@@ -163,7 +189,7 @@ export function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [check]);
+  }, [check, openExport]);
 
   // Show build failures in the log, but never pull the user out of a terminal (an agent may be
   // mid-edit); the status pill shows the failure there.
@@ -261,32 +287,135 @@ export function App() {
     [createProject],
   );
 
+  const viewerBodiesRef = useRef(state.viewerBodies);
+  viewerBodiesRef.current = state.viewerBodies;
+  const onSelection = useCallback(
+    (picks: Pick[], capture: () => string) => {
+      if (!picks.length) {
+        setSelection(null);
+        pendingPaste.current = null;
+        void backend.writeSelection(null).catch(() => {});
+        return;
+      }
+      const topos = new Map<string, Topo>();
+      for (const b of viewerBodiesRef.current) if (b.topo) topos.set(b.name, b.topo);
+      const summary = summarize(picks, topos);
+      setSelection({ picks, summary, pasted: false });
+      pendingPaste.current = summary;
+      const file = { ...selectionFile(picks, topos), screenshot: ".cad/selection.png" };
+      void backend
+        .writeSelection(JSON.stringify(file, null, 2), dataUrlBytes(capture()))
+        .catch((e) => log("error", `Could not save the selection: ${String(e)}`));
+    },
+    [backend, log],
+  );
+
+  const onTerminalFocus = useCallback((key: string) => {
+    lastTerminal.current = key;
+    const text = pendingPaste.current;
+    const paste = pasteFns.current.get(key);
+    if (!text || !paste) return;
+    pendingPaste.current = null;
+    paste(text + " ");
+    setSelection((s) => (s ? { ...s, pasted: true } : s));
+  }, []);
+
+  const readDoc = useCallback(
+    async (path: string): Promise<{ path: string; text?: string; image?: string }> => {
+      try {
+        if (path.toLowerCase().endsWith(".png")) {
+          const bytes = await backend.loadAsset(path);
+          return { path, image: URL.createObjectURL(new Blob([bytes], { type: "image/png" })) };
+        }
+        return { path, text: await backend.readFile(path) };
+      } catch (e) {
+        return { path, text: String(e) };
+      }
+    },
+    [backend],
+  );
+
   const openFile = async (path: string) => {
     if (!openFiles.some((f) => f.path === path)) {
-      let text: string;
-      try {
-        text = await backend.readFile(path);
-      } catch (e) {
-        text = String(e);
-      }
-      setOpenFiles((fs) => [...fs, { path, text }]);
+      const doc = await readDoc(path);
+      setOpenFiles((fs) => [...fs, doc]);
     }
     setActiveFile(path);
   };
 
-  // Keep open code tabs fresh when the project changes on disk.
+  // Keep open tabs fresh when the project changes on disk or a new check redraws the renders.
   useEffect(() => {
     if (!openFiles.length) return;
-    Promise.all(openFiles.map(async (f) => ({ path: f.path, text: await backend.readFile(f.path).catch((e) => String(e)) }))).then(
-      setOpenFiles,
-    );
+    const old = openFiles;
+    void Promise.all(old.map((f) => readDoc(f.path))).then((fresh) => {
+      old.forEach((f) => f.image && URL.revokeObjectURL(f.image));
+      setOpenFiles(fresh);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.lastBuiltAt, state.project]);
+  }, [state.lastBuiltAt, state.project, state.lastCheck]);
 
   const closeFile = (path: string) => {
-    setOpenFiles((fs) => fs.filter((f) => f.path !== path));
+    setOpenFiles((fs) => {
+      fs.filter((f) => f.path === path && f.image).forEach((f) => URL.revokeObjectURL(f.image!));
+      return fs.filter((f) => f.path !== path);
+    });
     if (activeFile === path) setActiveFile(null);
   };
+
+  // ---- problems: markers in the view, show one, send one to the agent
+  useEffect(() => setActiveProblem(null), [state.problems]);
+  const markers = useMemo(
+    () =>
+      state.problems.flatMap((p, i) =>
+        p.location && !hidden.has(p.body ?? "") ? [{ location: p.location, severity: p.severity, active: i === activeProblem }] : [],
+      ),
+    [state.problems, activeProblem, hidden],
+  );
+
+  const showProblem = (i: number) => {
+    const p = state.problems[i];
+    setActiveProblem(i);
+    if (p?.location) {
+      setActiveFile(null); // back to the model
+      setFocus((f) => ({ location: p.location!, n: (f?.n ?? 0) + 1 }));
+    }
+  };
+
+  const sendProblem = (i: number) => {
+    const p = state.problems[i];
+    if (!p) return;
+    const fromTab = tab.startsWith("term:") ? tab.slice(5) : null;
+    const last = lastTerminal.current && terminals.some((t) => t.key === lastTerminal.current) ? lastTerminal.current : null;
+    const key = fromTab ?? last ?? terminals[0]?.key;
+    const paste = key ? pasteFns.current.get(key) : undefined;
+    if (!key || !paste) {
+      log("error", "Open a terminal with your agent first, then send the problem again.");
+      return;
+    }
+    const where = p.location && !/\((-?\d|\s)/.test(p.message) ? ` near (${p.location.map((v) => v.toFixed(1)).join(", ")})` : "";
+    paste(`[Cadorphin check, ${p.severity}] ${p.message}${where} `);
+    setTab(`term:${key}`);
+    setPanelOpen(true);
+  };
+
+  const onExported = ({ result, warnings, folder }: ExportOutcome) => {
+    const files = result.files;
+    log("info", `Exported ${files.length} file${files.length === 1 ? "" : "s"}: ${files.join(", ")}`);
+    setToast({
+      kind: warnings.length ? "warn" : "ok",
+      title: `Exported ${files.length} file${files.length === 1 ? "" : "s"}${warnings.length ? ` with ${warnings.length} warning${warnings.length === 1 ? "" : "s"}` : ""}`,
+      files,
+      folder,
+      warnings: warnings.length,
+    });
+  };
+
+  // A clean export's notice goes away on its own; one with warnings stays until dismissed.
+  useEffect(() => {
+    if (toast?.kind !== "ok") return;
+    const t = setTimeout(() => setToast(null), 6000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   const current = openFiles.find((f) => f.path === activeFile);
 
@@ -300,6 +429,7 @@ export function App() {
         errorCount={errorCount}
         checking={state.checking}
         onCheck={check}
+        onExport={openExport}
         onOpen={() => void openFolder()}
       />
       <div className="main">
@@ -342,6 +472,10 @@ export function App() {
                     bboxText={bboxText}
                     theme={theme}
                     controlsMode={controls}
+                    onSelection={onSelection}
+                    clearSignal={clearSelection}
+                    markers={markers}
+                    focus={focus}
                     overlay={
                       <button
                         className="gear"
@@ -353,6 +487,17 @@ export function App() {
                       </button>
                     }
                   />
+                  {selection && (
+                    <div className="selection-chip" role="status">
+                      <span className="selection-what">{selection.summary.replace(/^\[Selected in the Cadorphin viewer: /, "").replace(/\. Details:.*$/, "")}</span>
+                      <span className="muted small">
+                        {selection.pasted ? "Added to your prompt" : "Click in the terminal to refer to it"} · Esc clears
+                      </span>
+                      <button className="close" aria-label="Clear selection" onClick={() => setClearSelection((n) => n + 1)}>
+                        ×
+                      </button>
+                    </div>
+                  )}
                   {state.status === "built" && bodies.length === 0 && (
                     <div className="viewer-empty">
                       <p>Nothing here yet.</p>
@@ -365,8 +510,16 @@ export function App() {
                 </div>
                 {current && (
                   <div className="layer code-view">
-                    <div className="code-head muted small">{current.path} · read-only</div>
-                    <pre className="mono">{current.text}</pre>
+                    <div className="code-head muted small">
+                      {current.path} · {current.image ? "from the last full check" : "read-only"}
+                    </div>
+                    {current.image ? (
+                      <div className="image-view">
+                        <img src={current.image} alt={current.path} />
+                      </div>
+                    ) : (
+                      <pre className="mono">{current.text}</pre>
+                    )}
                   </div>
                 )}
               </div>
@@ -375,6 +528,13 @@ export function App() {
                 tab={tab}
                 log={state.log}
                 problems={state.problems}
+                renders={state.lastCheck?.renders ?? []}
+                checking={state.checking}
+                activeProblem={activeProblem}
+                onShowProblem={showProblem}
+                onSendProblem={sendProblem}
+                onOpenRender={(p) => void openFile(p)}
+                onCheck={() => void check()}
                 terminals={terminals}
                 theme={theme}
                 onTab={setTab}
@@ -386,6 +546,11 @@ export function App() {
                 }}
                 onCloseTerminal={closeTerminal}
                 onTerminalExit={(key) => setTerminals((ts) => ts.map((t) => (t.key === key ? { ...t, exited: true } : t)))}
+                onTerminalFocus={onTerminalFocus}
+                registerTerminalPaste={(key, paste) => {
+                  if (paste) pasteFns.current.set(key, paste);
+                  else pasteFns.current.delete(key);
+                }}
                 onTerminalInput={(key) => setTerminals((ts) => ts.map((t) => (t.key === key && !t.used ? { ...t, used: true } : t)))}
                 onTerminalError={(m) => log("error", `Terminal: ${m}`)}
               />
@@ -436,6 +601,47 @@ export function App() {
         />
       )}
       {dialog?.kind === "about" && <AboutDialog engine={state.engine} onClose={closeDialog} />}
+      {dialog?.kind === "export" && state.project && (
+        <ExportDialog
+          projectRoot={state.project.root}
+          runCheck={() => runCheck("full")}
+          onExported={onExported}
+          onFix={() => {
+            setDialog(null);
+            setTab("problems");
+            setPanelOpen(true);
+          }}
+          onClose={closeDialog}
+        />
+      )}
+      {toast && (
+        <div className={`toast ${toast.kind}`} role="status">
+          <div className="toast-body">
+            <strong>{toast.title}</strong>
+            <span className="muted small mono">{toast.files.map((f) => f.split(/[\\/]/).pop()).join(", ")}</span>
+          </div>
+          <div className="toast-actions">
+            <button className="btn small-btn" onClick={() => void backend.revealFolder(toast.folder).catch((e) => log("error", String(e)))}>
+              Open folder
+            </button>
+            {toast.warnings > 0 && (
+              <button
+                className="btn small-btn"
+                onClick={() => {
+                  setTab("problems");
+                  setPanelOpen(true);
+                  setToast(null);
+                }}
+              >
+                Show problems
+              </button>
+            )}
+            <button className="close" aria-label="Dismiss" onClick={() => setToast(null)}>
+              ×
+            </button>
+          </div>
+        </div>
+      )}
       {dialog?.kind === "new" && <NewProjectDialog onCreate={createAndOpen} onClose={closeDialog} />}
       {dialog?.kind === "confirm" && (
         <ConfirmDialog
@@ -460,4 +666,14 @@ export function App() {
       )}
     </div>
   );
+}
+
+/** The bytes of a "data:image/png;base64,..." URL. */
+function dataUrlBytes(url: string): Uint8Array | undefined {
+  const b64 = url.split(",")[1];
+  if (!b64) return undefined;
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
 }

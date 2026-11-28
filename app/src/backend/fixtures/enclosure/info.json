@@ -1,10 +1,14 @@
 {
+  "ok": true,
+  "op": "info",
+  "exit_code": 0,
   "root": "/mock/demo",
   "name": "demo",
   "units": "mm",
   "profile": {
     "id": "generic-256",
     "name": "Generic 256",
+    "vendor": "Generic",
     "build_volume_mm": [
       256.0,
       256.0,
@@ -241,6 +245,7 @@
   "files": [
     "AGENTS.md",
     "CLAUDE.md",
+    "GEMINI.md",
     "model.py",
     "params.toml",
     "project.toml"

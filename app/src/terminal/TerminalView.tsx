@@ -15,6 +15,10 @@ interface Props {
   onExit: (code: number | null) => void;
   /** Called once, on the user's first keystroke. */
   onFirstInput?: () => void;
+  /** The terminal got keyboard focus (the user clicked into it or switched to its tab). */
+  onFocus?: () => void;
+  /** Receives a function that pastes text into the terminal as if the user pasted it, or null when it closes. */
+  registerPaste?: (paste: ((text: string) => void) | null) => void;
   onError: (message: string) => void;
 }
 
@@ -45,14 +49,14 @@ function xtermTheme(): ITheme {
 }
 
 /** One terminal tab: xterm.js wired to a backend PTY running the user's shell. */
-export function TerminalView({ command, active, theme, onReady, onExit, onFirstInput, onError }: Props) {
+export function TerminalView({ command, active, theme, onReady, onExit, onFirstInput, onFocus, registerPaste, onError }: Props) {
   const backend = useBackend();
   const host = useRef<HTMLDivElement>(null);
   const term = useRef<Terminal | null>(null);
   const fit = useRef<FitAddon | null>(null);
   const termId = useRef<TerminalId | null>(null);
-  const callbacks = useRef({ onReady, onExit, onFirstInput, onError });
-  callbacks.current = { onReady, onExit, onFirstInput, onError };
+  const callbacks = useRef({ onReady, onExit, onFirstInput, onFocus, registerPaste, onError });
+  callbacks.current = { onReady, onExit, onFirstInput, onFocus, registerPaste, onError };
 
   useEffect(() => {
     const t = new Terminal({
@@ -105,12 +109,18 @@ export function TerminalView({ command, active, theme, onReady, onExit, onFirstI
         const resize = t.onResize(({ cols, rows }) => backend.resizeTerminal(id, cols, rows));
         unsubs.push(() => input.dispose(), () => resize.dispose());
         backend.resizeTerminal(id, t.cols, t.rows);
+        // xterm wraps pasted text in bracketed-paste markers when the program asked for them, so an
+        // agent's prompt treats it as typed input, not as keystrokes to act on.
+        callbacks.current.registerPaste?.((text) => t.paste(text));
         callbacks.current.onReady(id);
       })
       .catch((e) => {
         t.write(`\x1b[31m${String(e)}\x1b[0m\r\n`);
         callbacks.current.onError(String(e));
       });
+
+    const onFocusIn = () => callbacks.current.onFocus?.();
+    t.textarea?.addEventListener("focus", onFocusIn);
 
     const ro = new ResizeObserver(() => {
       if (host.current && host.current.offsetParent !== null) {
@@ -126,6 +136,8 @@ export function TerminalView({ command, active, theme, onReady, onExit, onFirstI
     return () => {
       disposed = true;
       ro.disconnect();
+      t.textarea?.removeEventListener("focus", onFocusIn);
+      callbacks.current.registerPaste?.(null);
       unsubs.forEach((u) => u());
       if (termId.current) void backend.closeTerminal(termId.current);
       t.dispose();

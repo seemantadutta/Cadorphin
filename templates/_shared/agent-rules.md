@@ -9,4 +9,5 @@ This folder is a cadkit CAD project. You design the part by editing code; the Ca
 - Export with `cadkit export --format 3mf` (or `step`, `stl`). Files go to `.cad/export/`.
 - The printer is the `profile` in `project.toml`; the user can change it from Cadorphin's Preferences, so check `cadkit info` for the current build volume instead of remembering it. Respect that volume and the profile's defaults (minimum wall, fit clearance). Change the printer only when asked, with `cadkit set-profile ID` (`cadkit profiles` lists them).
 - Units are millimetres.
+- When the user says "this" or "here", or their message includes `[Selected in the Cadorphin viewer: ...]`, they picked faces or edges in the 3D view. Read `.cad/selection.json` (geometry in mm, Z up) and look at `.cad/selection.png`. Find the matching feature in `model.py`, usually a parameter or a loop, and change it there rather than hard-coding the coordinates. If the selection is one of several identical features, ask whether to change just that one or all of them, unless the request makes it clear.
 - Do not edit anything in `.cad/`; it is generated.

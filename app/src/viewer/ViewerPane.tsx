@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { settings } from "../settings";
+import type { Pick } from "./topo";
 import { Viewer, type ControlsMode, type Projection, type ViewName, type ViewerBody, type ViewerTheme } from "./Viewer";
 
 interface Props {
@@ -10,12 +11,26 @@ interface Props {
   theme: "light" | "dark";
   controlsMode: ControlsMode;
   overlay?: React.ReactNode;
+  /** Point-and-fix: the selection changed. `capture` renders the view (with highlights) as a PNG data URL. */
+  onSelection?: (picks: Pick[], capture: () => string) => void;
+  /** Bumped by the parent to clear the selection. */
+  clearSignal?: number;
+  /** Problem markers. */
+  markers?: { location: [number, number, number]; severity: "error" | "warning"; active: boolean }[];
+  /** Glide to this location whenever `n` changes (clicking a problem). */
+  focus?: { location: [number, number, number]; n: number } | null;
 }
 
 function readTheme(): ViewerTheme {
   const css = getComputedStyle(document.documentElement);
   const v = (name: string) => css.getPropertyValue(name).trim();
-  return { background: v("--viewer-bg"), grid: v("--viewer-grid"), gridCenter: v("--viewer-grid-center"), edge: v("--viewer-edge") };
+  return {
+    background: v("--viewer-bg"),
+    grid: v("--viewer-grid"),
+    gridCenter: v("--viewer-grid-center"),
+    edge: v("--viewer-edge"),
+    accent: v("--accent"),
+  };
 }
 
 const VIEWS: [ViewName, string, string][] = [
@@ -25,15 +40,28 @@ const VIEWS: [ViewName, string, string][] = [
   ["right", "Right", "3"],
 ];
 
-export function ViewerPane({ bodies, hidden, bboxText, theme, controlsMode, overlay }: Props) {
+export function ViewerPane({ bodies, hidden, bboxText, theme, controlsMode, overlay, onSelection, clearSignal, markers, focus }: Props) {
   const host = useRef<HTMLDivElement>(null);
   const viewer = useRef<Viewer | null>(null);
   const [projection, setProjection] = useState<Projection>(settings.get("projection"));
   const [hint, setHint] = useState(!settings.get("hintDismissed"));
+  const selectionCb = useRef(onSelection);
+  selectionCb.current = onSelection;
+
+  useEffect(() => {
+    if (clearSignal) viewer.current?.clearSelection();
+  }, [clearSignal]);
+
+  useEffect(() => viewer.current?.setMarkers(markers ?? []), [markers]);
+
+  useEffect(() => {
+    if (focus) viewer.current?.focusOn(focus.location);
+  }, [focus]);
 
   useEffect(() => {
     const v = new Viewer(host.current!, readTheme());
     viewer.current = v;
+    v.onSelectionChange = (picks) => selectionCb.current?.(picks, () => v.capture());
     v.setProjection(settings.get("projection"));
     return () => {
       v.dispose();
@@ -70,7 +98,10 @@ export function ViewerPane({ bodies, hidden, bboxText, theme, controlsMode, over
       const t = e.target as HTMLElement;
       if (e.ctrlKey || e.metaKey || e.altKey || t.closest("input, textarea, [contenteditable]")) return;
       const view = VIEWS.find(([, , key]) => key === e.key);
-      if (view) viewer.current?.setView(view[0]);
+      if (e.key === "Escape") {
+        if (!viewer.current?.selection.length) return;
+        viewer.current.clearSelection();
+      } else if (view) viewer.current?.setView(view[0]);
       else if (e.key === "f" || e.key === "F") viewer.current?.fit();
       else if (e.key === "p" || e.key === "P") chooseProjection(viewer.current?.projection === "perspective" ? "orthographic" : "perspective");
       else return;
@@ -112,8 +143,8 @@ export function ViewerPane({ bodies, hidden, bboxText, theme, controlsMode, over
         {hint && (
           <div className="hint">
             {controlsMode === "orbit"
-              ? "Left-drag to rotate · Right-, middle- or Shift-drag to pan · Scroll to zoom · Double-click to set the orbit point"
-              : "Left-drag to rotate freely · Right- or middle-drag to pan · Scroll to zoom · Double-click to set the orbit point"}
+              ? "Click a face or edge to point at it (Shift adds, Ctrl+drag boxes, Esc clears) · Left-drag rotates · Right- or middle-drag pans · Scroll zooms · Double-click sets the orbit point"
+              : "Click a face or edge to point at it (Shift adds, Ctrl+drag boxes, Esc clears) · Left-drag rotates freely · Right- or middle-drag pans · Scroll zooms · Double-click sets the orbit point"}
             <button
               className="hint-close"
               aria-label="Dismiss hint"

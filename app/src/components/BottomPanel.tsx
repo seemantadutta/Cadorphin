@@ -5,6 +5,7 @@ import { settings } from "../settings";
 import type { LogEntry } from "../state/useProject";
 import { KNOWN_AGENTS } from "../terminal/agents";
 import { TerminalView } from "../terminal/TerminalView";
+import { ProblemsPanel } from "./ProblemsPanel";
 
 export interface TermTab {
   key: string;
@@ -23,6 +24,13 @@ interface Props {
   tab: BottomTab;
   log: LogEntry[];
   problems: Problem[];
+  renders: string[];
+  checking: boolean;
+  activeProblem: number | null;
+  onShowProblem: (index: number) => void;
+  onSendProblem: (index: number) => void;
+  onOpenRender: (path: string) => void;
+  onCheck: () => void;
   terminals: TermTab[];
   theme: "light" | "dark";
   onTab: (t: BottomTab) => void;
@@ -33,6 +41,8 @@ interface Props {
   onCloseTerminal: (key: string) => void;
   onTerminalExit: (key: string) => void;
   onTerminalInput: (key: string) => void;
+  onTerminalFocus?: (key: string) => void;
+  registerTerminalPaste?: (key: string, paste: ((text: string) => void) | null) => void;
   onTerminalError: (message: string) => void;
 }
 
@@ -189,6 +199,8 @@ export function BottomPanel(props: Props) {
             onReady={() => {}}
             onExit={() => props.onTerminalExit(t.key)}
             onFirstInput={() => props.onTerminalInput(t.key)}
+            onFocus={() => props.onTerminalFocus?.(t.key)}
+            registerPaste={(paste) => props.registerTerminalPaste?.(t.key, paste)}
             onError={props.onTerminalError}
           />
         ))}
@@ -207,18 +219,16 @@ export function BottomPanel(props: Props) {
           </div>
         )}
         {tab === "problems" && (
-          <div className="panel-body mono">
-            <div className="problems">
-              {!problems.length && <div className="ok-text">✓ No problems found</div>}
-              {problems.map((p, i) => (
-                <div key={i} className={`problem ${p.severity}`}>
-                  <span className="sev">{p.severity === "error" ? "✗" : "⚠"}</span>
-                  <span>{p.message}</span>
-                  {p.location && <span className="muted"> near ({p.location.map((v) => v.toFixed(1)).join(", ")})</span>}
-                </div>
-              ))}
-            </div>
-          </div>
+          <ProblemsPanel
+            problems={problems}
+            renders={props.renders}
+            checking={props.checking}
+            active={props.activeProblem}
+            onShow={props.onShowProblem}
+            onSend={props.onSendProblem}
+            onOpenRender={props.onOpenRender}
+            onCheck={props.onCheck}
+          />
         )}
         {!terminals.length && tab.startsWith("term:") && (
           <div className="panel-body muted">

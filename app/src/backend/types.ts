@@ -29,7 +29,7 @@ export interface PrinterProfile {
 }
 
 /** Ids the native menu sends (app/src-tauri/src/lib.rs, build_menu). */
-export type MenuId = "new" | "open" | "close" | "preferences" | "about";
+export type MenuId = "new" | "open" | "close" | "export" | "preferences" | "about";
 
 /** A project template for `cadkit new` (templates/). */
 export interface ProjectTemplate {
@@ -91,6 +91,8 @@ export interface BodyInfo {
   volume_mm3: number;
   valid: boolean;
   glb?: string;
+  /** Face and edge descriptions for point-and-fix (cadkit/topology.py). */
+  topo?: string;
 }
 
 /** Output of `cadkit build --json` (also written to .cad/manifest.json). */
@@ -118,6 +120,9 @@ export interface CheckReport {
   errors: string[];
   notes: string[];
   log?: string;
+  /** Full check only: the PNG renders (project-relative) and the limits the walls were checked against. */
+  renders?: string[];
+  checks?: { min_wall_mm: number; nozzle_mm: number };
 }
 
 /** Output of `cadkit export --json`. */
@@ -159,8 +164,16 @@ export interface Backend {
   onFileChanged(cb: (paths: string[]) => void): Unsubscribe;
   build(): Promise<BuildManifest>;
   check(level: "fast" | "full"): Promise<CheckReport>;
-  export(format: "step" | "stl" | "3mf", outDir?: string): Promise<ExportResult>;
+  /** `force` exports even when the checks find errors. */
+  export(format: "step" | "stl" | "3mf", outDir?: string, force?: boolean): Promise<ExportResult>;
+  /** Opens a folder (absolute, or relative to the project) in the system file manager. */
+  revealFolder(path: string): Promise<void>;
   readFile(path: string): Promise<string>;
+  /**
+   * Point-and-fix: writes .cad/selection.json (and the highlighted screenshot as .cad/selection.png)
+   * for the agent. `null` means the selection was cleared: both files are removed.
+   */
+  writeSelection(json: string | null, png?: Uint8Array): Promise<void>;
   /** Changes values in params.toml (via `cadkit set`). The watcher then triggers a rebuild. */
   writeParams(values: Record<string, ParamValue>): Promise<SetParamsResult>;
   /** Bundled printer profiles plus the open project's own `profiles/` folder. */
@@ -184,10 +197,4 @@ export interface Backend {
   closeTerminal(id: TerminalId): Promise<void>;
   /** GLB files and renders, as raw bytes. Paths are relative to the project folder. */
   loadAsset(path: string): Promise<ArrayBuffer>;
-}
-
-export class NotYetImplemented extends Error {
-  constructor(feature: string, milestone: string) {
-    super(`${feature} arrives in ${milestone}`);
-  }
 }
