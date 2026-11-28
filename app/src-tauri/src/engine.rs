@@ -16,18 +16,24 @@ use serde_json::{json, Value};
 const STARTUP_TIMEOUT: Duration = Duration::from_secs(120);
 const STDERR_TAIL: usize = 6000;
 
-/// How to run Python. v1 requires the user to install Python 3.11–3.12 with cadkit.
+/// How to run Python. Release builds ship their own (scripts/bundle_python.py); dev builds
+/// use the repo's .venv; otherwise the user's Python with cadkit installed.
 #[derive(Clone, Debug)]
 pub struct PythonCmd {
     pub program: PathBuf,
+    /// Folder put first on the terminals' PATH, so `cadkit` there is the app's own.
+    pub tools: Option<PathBuf>,
+    /// The app's own Python: keep the user's PYTHON* variables and site-packages out of it.
+    pub bundled: bool,
 }
 
 impl PythonCmd {
-    /// CADORPHIN_PYTHON wins; dev builds use the repo's .venv; otherwise `python` on PATH.
-    pub fn discover() -> Self {
+    /// CADORPHIN_PYTHON wins; then the repo's .venv (dev builds), the Python bundled under
+    /// `resources` (release builds), and finally `python` on PATH.
+    pub fn discover(resources: Option<&Path>) -> Self {
         if let Ok(p) = std::env::var("CADORPHIN_PYTHON") {
             if !p.trim().is_empty() {
-                return Self { program: PathBuf::from(p) };
+                return Self::user(PathBuf::from(p));
             }
         }
         #[cfg(debug_assertions)]
@@ -35,10 +41,22 @@ impl PythonCmd {
             let venv = Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("..").join(".venv");
             let py = if cfg!(windows) { venv.join("Scripts").join("python.exe") } else { venv.join("bin").join("python") };
             if py.exists() {
-                return Self { program: py };
+                return Self::user(py);
             }
         }
-        Self { program: PathBuf::from(if cfg!(windows) { "python" } else { "python3" }) }
+        if let Some(root) = resources.map(|r| r.join("python")) {
+            let py = if cfg!(windows) { root.join("python.exe") } else { root.join("bin").join("python3") };
+            if py.exists() {
+                return Self { program: py, tools: Some(root.join("shims")), bundled: true };
+            }
+        }
+        Self::user(PathBuf::from(if cfg!(windows) { "python" } else { "python3" }))
+    }
+
+    /// A Python the user set up. Its scripts folder (a venv's Scripts/ or bin/) also holds `cadkit`.
+    fn user(program: PathBuf) -> Self {
+        let tools = program.is_absolute().then(|| program.parent().map(Path::to_path_buf)).flatten();
+        Self { program, tools, bundled: false }
     }
 }
 
@@ -57,17 +75,26 @@ pub struct Engine {
     pub ready: Value,
 }
 
-fn setup_hint(python: &Path) -> String {
+fn setup_hint(python: &PythonCmd) -> String {
+    if python.bundled {
+        return format!(
+            "Cadorphin's built-in Python did not start; reinstalling Cadorphin should fix it. Tried: {}",
+            python.program.display()
+        );
+    }
     format!(
-        "Cadorphin needs Python 3.11–3.12 with cadkit installed (pip install cadkit), \
+        "Cadorphin needs Python 3.11–3.12 with cadkit installed, \
          or set CADORPHIN_PYTHON to a Python that has it. Tried: {}",
-        python.display()
+        python.program.display()
     )
 }
 
 impl Engine {
     pub fn start(python: &PythonCmd) -> Result<Self, String> {
         let mut cmd = Command::new(&python.program);
+        if python.bundled {
+            cmd.args(["-E", "-s"]); // ignore PYTHONPATH/PYTHONHOME and the user's site-packages
+        }
         cmd.args(["-m", "cadkit", "serve"])
             .env("PYTHONUTF8", "1")
             .env("PYTHONIOENCODING", "utf-8")
@@ -82,7 +109,7 @@ impl Engine {
         }
         let mut child = cmd
             .spawn()
-            .map_err(|e| format!("Could not start the CAD engine: {e}. {}", setup_hint(&python.program)))?;
+            .map_err(|e| format!("Could not start the CAD engine: {e}. {}", setup_hint(python)))?;
 
         let stdin = child.stdin.take().expect("piped stdin");
         let stdout = child.stdout.take().expect("piped stdout");
@@ -135,7 +162,7 @@ impl Engine {
             Err(RecvTimeoutError::Disconnected) => {
                 std::thread::sleep(Duration::from_millis(200)); // let stderr drain
                 let tail = engine.stderr_tail();
-                Err(format!("The CAD engine exited during startup. {}\n\n{tail}", setup_hint(&python.program)))
+                Err(format!("The CAD engine exited during startup. {}\n\n{tail}", setup_hint(python)))
             }
         }
     }

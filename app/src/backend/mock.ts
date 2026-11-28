@@ -94,7 +94,7 @@ export class MockBackend implements Backend {
   private nextTerm = 1;
 
   async engineInfo(): Promise<EngineInfo> {
-    return { cadkit: "0.1.0 (mock)", build123d: "0.13.0", python: "mock" };
+    return { cadkit: "1.0.0 (mock)", build123d: "0.13.0", python: "mock" };
   }
 
   async initialProject() {
@@ -222,7 +222,15 @@ export class MockBackend implements Backend {
   }
 
   async appVersion() {
-    return "0.1.0-preview";
+    return "1.0.0-preview";
+  }
+
+  async checkForUpdate() {
+    return null; // the browser preview never updates
+  }
+
+  async installUpdate() {
+    throw new Error("The browser preview can't install updates");
   }
 
   async openTerminal(opts: { command?: string }): Promise<TerminalId> {

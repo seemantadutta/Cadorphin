@@ -10,6 +10,7 @@ import { PreferencesDialog, type PrefsSection } from "./components/PreferencesDi
 import { Sidebar } from "./components/Sidebar";
 import { StatusBar } from "./components/StatusBar";
 import { TopBar } from "./components/TopBar";
+import { UpdateNotice } from "./components/UpdateNotice";
 import { Welcome } from "./components/Welcome";
 import { projectKey, settings, type ProjectAgent, type ThemeChoice } from "./settings";
 import { agentFor, findAgent, type AgentDef } from "./terminal/agents";
@@ -60,6 +61,7 @@ export function App() {
     | null
   >(null);
   const closeDialog = useCallback(() => setDialog(null), []);
+  const [updateCheck, setUpdateCheck] = useState(0); // bumped by Help → Check for Updates…
   // Point-and-fix: what is picked in the viewer, and whether its reference still has to be pasted
   // into a terminal (it is pasted once, the next time a terminal gets focus).
   const [selection, setSelection] = useState<{ picks: Pick[]; summary: string; pasted: boolean } | null>(null);
@@ -172,6 +174,7 @@ export function App() {
         else if (id === "export") openExport();
         else if (id === "preferences") setDialog({ kind: "prefs", section: "printer" });
         else if (id === "about") setDialog({ kind: "about" });
+        else if (id === "check_updates") setUpdateCheck((n) => n + 1);
       }),
     [backend, newProject, openFolder, close, openExport],
   );
@@ -622,6 +625,7 @@ export function App() {
           onClose={closeDialog}
         />
       )}
+      <UpdateNotice manualCheck={updateCheck} log={log} />
       {toast && (
         <div className={`toast ${toast.kind}`} role="status">
           <div className="toast-body">
