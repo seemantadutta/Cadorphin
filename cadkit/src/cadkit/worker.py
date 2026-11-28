@@ -164,6 +164,15 @@ def op_check(project: Project, bodies: dict[str, Body], req: dict[str, Any], res
 def op_export(project: Project, bodies: dict[str, Body], req: dict[str, Any], res: dict[str, Any]) -> None:
     from .exporters import write_3mf, write_step, write_stl
 
+    wanted = req.get("bodies")
+    if wanted:
+        unknown = [n for n in wanted if n not in bodies]
+        if unknown:
+            known = ", ".join(bodies) or "none"
+            res["problems"].append(Problem("error", "unknown_body", f"No body named {', '.join(unknown)} (bodies: {known})").to_json())
+            return
+        # Check and export only the chosen bodies, so a problem on a body left out does not block them
+        bodies = {n: b for n, b in bodies.items() if n in wanted}
     op_check(project, bodies, {"level": "fast"}, res)
     if not bodies:
         res["notes"].clear()
@@ -176,16 +185,18 @@ def op_export(project: Project, bodies: dict[str, Body], req: dict[str, Any], re
     if not out.is_absolute():
         out = Path(req.get("cwd", project.root)) / out
     fmt = req["format"]
+    # One chosen body gets its own file name, so it does not overwrite the full export
+    stem = f"{project.name}-{next(iter(bodies))}" if wanted and len(bodies) == 1 else project.name
     files: list[Path] = []
     if fmt == "step":
-        files.append(out / f"{project.name}.step")
+        files.append(out / f"{stem}.step")
         write_step(bodies, files[-1])
     elif fmt == "stl":
         for name, body in bodies.items():
             files.append(out / f"{project.name}-{name}.stl")
             write_stl(name, body, files[-1])
     elif fmt == "3mf":
-        files.append(out / f"{project.name}.3mf")
+        files.append(out / f"{stem}.3mf")
         write_3mf(bodies, files[-1])
     else:
         raise ValueError(f"Unknown export format {fmt!r}")

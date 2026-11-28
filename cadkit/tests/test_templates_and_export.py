@@ -129,3 +129,28 @@ def test_demo_project(cli):
     (box,) = res["bodies"]
     assert box["name"] == "box" and box["bbox"] == [60.0, 40.0, 25.0]
     assert 0 < box["volume_mm3"] < 0.5 * 60 * 40 * 25  # hollow, not a solid block
+
+
+def test_export_chosen_bodies(tmp_path, cli, monkeypatch):
+    code, res = cli("new", str(tmp_path / "demo"), "--template", "enclosure")
+    assert code == 0, res
+    demo = tmp_path / "demo"
+    monkeypatch.chdir(demo)
+
+    code, res = cli("export", "--format", "3mf", "--bodies", "lid")
+    assert code == 0, res
+    assert res["files"] == [".cad/export/demo-lid.3mf"]
+    assert [o[0] for o in read_3mf(demo / ".cad" / "export" / "demo-lid.3mf")] == ["lid"]
+
+    code, res = cli("export", "--format", "3mf", "--bodies", "case, light_pipe")
+    assert code == 0, res
+    assert res["files"] == [".cad/export/demo.3mf"]
+    assert [o[0] for o in read_3mf(demo / ".cad" / "export" / "demo.3mf")] == ["case", "light_pipe"]
+
+    code, res = cli("export", "--format", "stl", "--bodies", "case")
+    assert code == 0, res
+    assert res["files"] == [".cad/export/demo-case.stl"]
+
+    code, res = cli("export", "--format", "3mf", "--bodies", "nope")
+    assert code != 0
+    assert res["problems"][0]["code"] == "unknown_body"

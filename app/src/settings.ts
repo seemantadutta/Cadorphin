@@ -24,6 +24,10 @@ interface Settings {
   /** The export dialog's last format, and its output folder per project (missing = .cad/export). */
   exportFormat: ExportFormat;
   exportDirs: Record<string, string>;
+  /** The export dialog lists the bodies to choose from (off = always export all of them). */
+  exportChooseBodies: boolean;
+  /** Per project: bodies the user left out of the last export. Stored as left-out names so new bodies start ticked. */
+  exportExcluded: Record<string, string[]>;
   /** Ask before leaving a project closes terminals the user has worked in. */
   confirmCloseTerminals: boolean;
   /** The agent id the New Project dialog suggests ("" = a plain terminal). */
@@ -49,6 +53,8 @@ const DEFAULTS: Settings = {
   confirmCloseTerminals: true,
   exportFormat: "3mf",
   exportDirs: {},
+  exportChooseBodies: true,
+  exportExcluded: {},
   sidebarFolds: {},
   projectAgents: {},
   controls: "orbit",

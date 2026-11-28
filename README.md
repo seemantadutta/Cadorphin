@@ -28,7 +28,7 @@ cadkit check
 cadkit export --format 3mf               # -> .cad/export/demo.3mf
 ```
 
-Open `.cad/export/demo.3mf` in your slicer. The case, lid and light pipe are separate named objects, so you can give the light pipe a different filament.
+Open `.cad/export/demo.3mf` in your slicer. The case, lid and light pipe are separate named objects, so you can give the light pipe a different filament. To export only some bodies, pass `--bodies lid,light_pipe`, or untick the others in the app's export dialog.
 
 Then point your agent at the folder. `cadkit new` writes a `CLAUDE.md` / `AGENTS.md` that tells it how to work: edit `model.py` and `params.toml`, then run `cadkit check --full` after every change.
 
@@ -76,7 +76,7 @@ docs/        architecture, CLI reference, profiles, UI mockups
 - [x] **M1** `cadkit` core: `new`, `build`, `check --fast`, `export` (STEP, STL, 3MF)
 - [x] **M2** Desktop shell and 3D viewer, live rebuild on file change
 - [x] **M3** Terminal pane and agent loop, parameters panel
-- [ ] **M4** Full checks (thin walls, renders), Problems tab, export dialog, profile picker
+- [ ] **M4** Full checks (thin walls, renders), Problems tab, export dialog (choose which bodies), profile picker
 
 ## Security
 

@@ -160,10 +160,13 @@ export class MockBackend implements Backend {
     return { ok: true, exit_code: 0, bodies: m.bodies, problems: [], errors: [], notes: [] };
   }
 
-  async export(format: "step" | "stl" | "3mf"): Promise<ExportResult> {
+  async export(format: "step" | "stl" | "3mf", _outDir?: string, _force?: boolean, bodies?: string[]): Promise<ExportResult> {
     await delay(400);
+    const names = bodies?.length ? bodies : ["case", "lid", "light_pipe"];
     const files =
-      format === "stl" ? ["case", "lid", "light_pipe"].map((b) => `.cad/export/demo-${b}.stl`) : [`.cad/export/demo.${format}`];
+      format === "stl"
+        ? names.map((b) => `.cad/export/demo-${b}.stl`)
+        : [`.cad/export/demo${bodies?.length === 1 ? `-${bodies[0]}` : ""}.${format}`];
     return { ok: true, exit_code: 0, files, problems: [], errors: [], notes: [] };
   }
 

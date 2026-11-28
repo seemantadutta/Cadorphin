@@ -147,7 +147,9 @@ def cmd_check(a: argparse.Namespace) -> int:
 
 
 def cmd_export(a: argparse.Namespace) -> int:
-    req = {"op": "export", "project": a.path, "format": a.format, "out": a.out, "force": a.force, "cwd": os.getcwd()}
+    bodies = [b.strip() for b in a.bodies.split(",") if b.strip()] if a.bodies else None
+    req = {"op": "export", "project": a.path, "format": a.format, "out": a.out, "force": a.force, "cwd": os.getcwd(),
+           "bodies": bodies}
     return _emit(run_worker(req, a.timeout), a.json)
 
 
@@ -278,6 +280,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--format", required=True, choices=["step", "stl", "3mf"])
     p.add_argument("--out", help="output folder (default: .cad/export)")
     p.add_argument("--force", action="store_true", help="export even if checks find errors")
+    p.add_argument("--bodies", metavar="A,B", help="export only these bodies, comma-separated (default: all)")
     p.set_defaults(func=cmd_export)
 
     p = sub.add_parser("new", help="create a project from a template")
