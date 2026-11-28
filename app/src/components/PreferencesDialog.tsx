@@ -7,13 +7,14 @@ import type { ControlsMode } from "../viewer/Viewer";
 import { Dialog } from "./Dialog";
 import { volumeText } from "./format";
 
-export type PrefsSection = "printer" | "appearance" | "viewer" | "terminals";
+export type PrefsSection = "printer" | "appearance" | "viewer" | "terminals" | "export";
 
 const SECTIONS: { id: PrefsSection; label: string }[] = [
   { id: "printer", label: "Printer" },
   { id: "appearance", label: "Appearance" },
   { id: "viewer", label: "Viewer" },
   { id: "terminals", label: "Terminals" },
+  { id: "export", label: "Export" },
 ];
 
 interface Props {
@@ -53,6 +54,7 @@ export function PreferencesDialog(props: Props) {
             </section>
           )}
           {section === "terminals" && <TerminalsSection />}
+          {section === "export" && <ExportSection />}
           {section === "viewer" && (
             <section>
               <h3>Mouse controls</h3>
@@ -69,6 +71,27 @@ export function PreferencesDialog(props: Props) {
         </div>
       </div>
     </Dialog>
+  );
+}
+
+function ExportSection() {
+  const [choose, setChoose] = useState(settings.get("exportChooseBodies"));
+  return (
+    <section>
+      <h3>Bodies</h3>
+      <label className="choice">
+        <input
+          type="checkbox"
+          checked={choose}
+          onChange={(e) => {
+            setChoose(e.target.checked);
+            settings.set("exportChooseBodies", e.target.checked);
+          }}
+        />
+        Ask which bodies to export
+      </label>
+      <p className="muted small">The export dialog lists the bodies so you can leave some out. When off, every export includes all bodies.</p>
+    </section>
   );
 }
 

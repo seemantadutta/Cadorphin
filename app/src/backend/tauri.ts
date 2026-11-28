@@ -132,8 +132,8 @@ export class TauriBackend implements Backend {
     return invoke<CheckReport>("check", { level });
   }
 
-  export(format: "step" | "stl" | "3mf", outDir?: string, force?: boolean) {
-    return invoke<ExportResult>("export", { format, outDir: outDir ?? null, force: force ?? false });
+  export(format: "step" | "stl" | "3mf", outDir?: string, force?: boolean, bodies?: string[]) {
+    return invoke<ExportResult>("export", { format, outDir: outDir ?? null, force: force ?? false, bodies: bodies ?? null });
   }
 
   async revealFolder(path: string) {

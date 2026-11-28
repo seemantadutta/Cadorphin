@@ -96,9 +96,11 @@ Each problem has:
 | `bodies` | Optional. All bodies involved, e.g. both bodies in an overlap. |
 | `location` | Optional. `[x, y, z]` in mm, for the viewer to highlight. |
 
-## `cadkit export [path] --format step|stl|3mf [--out DIR] [--force]`
+## `cadkit export [path] --format step|stl|3mf [--out DIR] [--force] [--bodies A,B]`
 
 Runs the fast checks first. If there are errors, nothing is exported and the exit code is 1, unless you pass `--force`. The default output folder is `.cad/export/`.
+
+`--bodies` exports only the named bodies (comma-separated). Only those bodies are checked, so an error on a body you left out does not block the export. An unknown name is an error. When exactly one body is chosen, the STEP and 3MF files are named `<project>-<body>` so they do not replace the full export.
 
 | Format | Output |
 |---|---|

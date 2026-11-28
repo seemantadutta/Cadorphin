@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
 
 import type { BodyInfo, ParamSpec, ParamValue, ProjectInfo } from "../backend/types";
 import { settings } from "../settings";
@@ -12,6 +12,8 @@ interface Props {
   onOpenFile: (path: string) => void;
   onToggleBody: (name: string) => void;
   onSetParam: (name: string, value: ParamValue) => void;
+  /** Opens the export dialog with only this body ticked. */
+  onExportBody: (name: string) => void;
 }
 
 /** Folded/unfolded state for every node of the tree, remembered across launches. */
@@ -34,6 +36,7 @@ function Node({
   onToggle,
   level,
   extra,
+  onContextMenu,
   children,
 }: {
   label: ReactNode;
@@ -42,11 +45,12 @@ function Node({
   onToggle: () => void;
   level: 1 | 2;
   extra?: ReactNode;
+  onContextMenu?: (e: MouseEvent) => void;
   children: ReactNode;
 }) {
   return (
     <div className={`tree-node level-${level}`}>
-      <div className="tree-row">
+      <div className="tree-row" onContextMenu={onContextMenu}>
         <button className="tree-toggle" aria-expanded={open} onClick={onToggle}>
           <span className={open ? "chevron open" : "chevron"} aria-hidden="true" />
           <span className="tree-label">{label}</span>
@@ -61,8 +65,40 @@ function Node({
 
 const mm = (v: number) => `${+v.toFixed(1)}`;
 
-export function Sidebar({ project, bodies, hidden, activeFile, onOpenFile, onToggleBody, onSetParam }: Props) {
+/** The body row's right-click menu; closes on any click, Esc, scroll or resize. */
+function BodyMenu({ x, y, name, onExport, onClose }: { x: number; y: number; name: string; onExport: () => void; onClose: () => void }) {
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("pointerdown", onClose);
+    window.addEventListener("keydown", key);
+    window.addEventListener("resize", onClose);
+    window.addEventListener("wheel", onClose, { passive: true });
+    return () => {
+      window.removeEventListener("pointerdown", onClose);
+      window.removeEventListener("keydown", key);
+      window.removeEventListener("resize", onClose);
+      window.removeEventListener("wheel", onClose);
+    };
+  }, [onClose]);
+  return (
+    <div className="context-menu" role="menu" style={{ left: x, top: y }} onPointerDown={(e) => e.stopPropagation()}>
+      <button
+        role="menuitem"
+        autoFocus
+        onClick={() => {
+          onClose();
+          onExport();
+        }}
+      >
+        Export {name}…
+      </button>
+    </div>
+  );
+}
+
+export function Sidebar({ project, bodies, hidden, activeFile, onOpenFile, onToggleBody, onSetParam, onExportBody }: Props) {
   const { isOpen, toggle } = useFolds();
+  const [menu, setMenu] = useState<{ x: number; y: number; name: string } | null>(null);
   const groups = new Map<string, ParamSpec[]>();
   for (const p of project.params) {
     const g = p.group ?? "Parameters";
@@ -71,6 +107,7 @@ export function Sidebar({ project, bodies, hidden, activeFile, onOpenFile, onTog
 
   return (
     <aside className="sidebar tree">
+      {menu && <BodyMenu {...menu} onExport={() => onExportBody(menu.name)} onClose={() => setMenu(null)} />}
       <Node label="Project" count={project.files.length} level={1} open={isOpen("project")} onToggle={() => toggle("project")}>
         <ul className="files mono">
           {project.files.map((f) => (
@@ -93,6 +130,10 @@ export function Sidebar({ project, bodies, hidden, activeFile, onOpenFile, onTog
               level={2}
               open={isOpen(id, false)}
               onToggle={() => toggle(id, false)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setMenu({ x: e.clientX, y: e.clientY, name: b.name });
+              }}
               label={
                 <>
                   <span className="swatch" style={{ background: b.color ?? "#B8BCC4" }} />
@@ -124,6 +165,9 @@ export function Sidebar({ project, bodies, hidden, activeFile, onOpenFile, onTog
                   </>
                 )}
               </dl>
+              <button className="link small body-export" onClick={() => onExportBody(b.name)}>
+                Export this body…
+              </button>
             </Node>
           );
         })}

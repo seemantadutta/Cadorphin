@@ -56,7 +56,7 @@ export function App() {
     | { kind: "new" }
     | { kind: "confirm"; title: string; body: string; label: string; action: () => void; offerDontAsk?: boolean }
     | { kind: "message"; title: string; body: string }
-    | { kind: "export" }
+    | { kind: "export"; only?: string }
     | null
   >(null);
   const closeDialog = useCallback(() => setDialog(null), []);
@@ -107,9 +107,13 @@ export function App() {
     await runCheck("full");
   }, [runCheck, state.project]);
 
-  const openExport = useCallback(() => {
-    if (state.project && state.manifest?.bodies.length) setDialog({ kind: "export" });
-  }, [state.project, state.manifest]);
+  /** `only`: start with just that body ticked (the sidebar's "Export this body…"). */
+  const openExport = useCallback(
+    (only?: string) => {
+      if (state.project && state.manifest?.bodies.length) setDialog({ kind: "export", only });
+    },
+    [state.project, state.manifest],
+  );
 
   // Leaving a project (open another, new, close) closes its terminals. Ask first if any of them
   // is in use, since an agent may be working in it.
@@ -429,7 +433,7 @@ export function App() {
         errorCount={errorCount}
         checking={state.checking}
         onCheck={check}
-        onExport={openExport}
+        onExport={() => openExport()}
         onOpen={() => void openFolder()}
       />
       <div className="main">
@@ -442,6 +446,7 @@ export function App() {
             onOpenFile={openFile}
             onToggleBody={toggleBody}
             onSetParam={setParam}
+            onExportBody={openExport}
           />
         )}
         <main className="center">
@@ -604,6 +609,9 @@ export function App() {
       {dialog?.kind === "export" && state.project && (
         <ExportDialog
           projectRoot={state.project.root}
+          bodies={bodies}
+          hidden={hidden}
+          only={dialog.only}
           runCheck={() => runCheck("full")}
           onExported={onExported}
           onFix={() => {

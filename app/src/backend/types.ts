@@ -164,8 +164,8 @@ export interface Backend {
   onFileChanged(cb: (paths: string[]) => void): Unsubscribe;
   build(): Promise<BuildManifest>;
   check(level: "fast" | "full"): Promise<CheckReport>;
-  /** `force` exports even when the checks find errors. */
-  export(format: "step" | "stl" | "3mf", outDir?: string, force?: boolean): Promise<ExportResult>;
+  /** `force` exports even when the checks find errors. `bodies` limits the export to those bodies (default: all). */
+  export(format: "step" | "stl" | "3mf", outDir?: string, force?: boolean, bodies?: string[]): Promise<ExportResult>;
   /** Opens a folder (absolute, or relative to the project) in the system file manager. */
   revealFolder(path: string): Promise<void>;
   readFile(path: string): Promise<string>;

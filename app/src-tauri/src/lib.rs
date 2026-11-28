@@ -309,12 +309,19 @@ async fn check(app: AppHandle, level: String) -> Result<Value, String> {
 }
 
 /// `force` exports even when the checks find errors (the export dialog's "Export anyway").
+/// `bodies` limits the export to those bodies (None = all).
 #[tauri::command]
-async fn export(app: AppHandle, format: String, out_dir: Option<String>, force: Option<bool>) -> Result<Value, String> {
+async fn export(
+    app: AppHandle,
+    format: String,
+    out_dir: Option<String>,
+    force: Option<bool>,
+    bodies: Option<Vec<String>>,
+) -> Result<Value, String> {
     blocking(move || {
         let root = project_root(&app)?;
         let req = json!({"op": "export", "project": root, "format": format, "out": out_dir, "cwd": root,
-                         "force": force.unwrap_or(false)});
+                         "force": force.unwrap_or(false), "bodies": bodies});
         engine_request(&app, req, EXPORT_TIMEOUT)
     })
     .await
